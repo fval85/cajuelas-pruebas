@@ -137,12 +137,12 @@ alCambiarSesion(revisarSaldo);
 function pintarBarra() {
   const n = cuantosPendientes();
   barra.hidden = n === 0;
-  barra.textContent = n ? `⏳ ${n} ${n === 1 ? 'registro pendiente' : 'registros pendientes'} de enviar a Google Sheets. Toque para enviar ahora.` : '';
+  barra.textContent = n ? `⏳ ${n} ${n === 1 ? 'registro pendiente' : 'registros pendientes'} de enviar. Toque para enviar ahora.` : '';
 }
 barra.addEventListener('click', async () => {
   if (!configurado()) return toast('Configure la URL y el token en Ajustes > Administración.', 5000);
   const r = await enviarPendientes();
-  if (r.error) toast(`Quedan ${r.restantes} pendientes. ${r.error}`, 6000); else toast('Todo enviado a Google Sheets.');
+  if (r.error) toast(`Quedan ${r.restantes} pendientes. ${r.error}`, 6000); else toast('Todo enviado.');
 });
 alCambiarPendientes(pintarBarra);
 pintarBarra();

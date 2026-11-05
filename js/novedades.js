@@ -1,16 +1,16 @@
 // Novedades de cada versión (se muestran en Ajustes > Novedades de la versión).
 export const NOVEDADES = [
-  { v: '2.12.0-pruebas4', t: [
-    'COPIA DE PRUEBAS · tramo 4: Históricos y Exportaciones ya viven dentro del servidor nuevo (ya no hace falta ningún Excel aparte). Reportes, Ventas de exportación y «Pasar día a Históricos» leen y escriben en la misma base.'
+  { v: '2.12.1', t: [
+    'Ajustes › Usuarios (administradores): crear usuarios con PIN temporal, cambiar rol, personalizar qué ve y qué puede hacer cada uno, restablecer el PIN, desactivar y volver a activar. Nadie puede desactivarse a sí mismo y siempre queda un administrador.',
+    'Exportaciones (administradores): ＋ Contrato (con todas las listas del Excel y «Agregar opción nueva»), 🚚 Salida en dos pasos —nuestra boleta al despachar y después la guía del comprador con sus kilos neto—, 💵 Pago, y editar o anular lo que se digitó mal. Todo queda en la auditoría.',
+    'Alerta de salidas sin guía del comprador: por defecto a los 3 días; se cambia en Ajustes › Alertas de exportación.'
   ] },
-  { v: '2.12.0-pruebas3', t: [
-    'COPIA DE PRUEBAS · tramo 3: Diario (recibos y su resumen por día o rango) y Boletos (movimientos, anulaciones e inventario) conectados al servidor nuevo, con permisos revisados en el servidor.'
-  ] },
-  { v: '2.12.0-pruebas2', t: [
-    'COPIA DE PRUEBAS · tramo 2: Registro conectado al servidor nuevo (guardar comprobantes y anulaciones sin duplicar, resumen del día y corrección de fecha para administradores, con auditoría). Diario y Boletos siguen pendientes.'
-  ] },
-  { v: '2.12.0-pruebas1', t: [
-    'COPIA DE PRUEBAS con el servidor nuevo (Supabase): entrada con usuario y PIN verificados en el servidor, catálogo y configuración. Registro, Diario y Boletos se conectan en los siguientes tramos.'
+  { v: '2.12.0', t: [
+    'Servidor nuevo: toda la información (registros, diario, boletos, históricos y exportaciones) vive ahora en una sola base de datos propia, fuera de Google. Ya no hay hojas de Excel separadas para cada cosa.',
+    'Ingreso con usuario y PIN verificado en el servidor, con bloqueo temporal tras varios intentos fallidos. Los permisos de cada usuario se validan en el servidor.',
+    'La primera vez hay que entrar de nuevo con su usuario y PIN. Lo que estaba pendiente de enviar se envía solo al servidor nuevo.',
+    'Cada usuario puede cambiar su propio PIN en Ajustes > «Cambiar mi PIN».',
+    'Excel queda solo para exportar.'
   ] },
   { v: '2.11.1', t: [
     'Cambio automático de dirección: si la hoja de Google se traslada a otra cuenta (nueva dirección /exec), el administrador la anota una sola vez en el Apps Script y cada teléfono se pasa solo la próxima vez que sincronice. Ya no hay que cambiarla teléfono por teléfono.'

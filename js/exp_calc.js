@@ -23,7 +23,7 @@ export function parseExp(resp) {
     const qqC = num(c['quintales']) || sacC * 1.5;
     return {
       id: txt(o['no. contrato']), cos: txt(o['cosecha']), tipo: txt(o['tipo']), comp: txt(o['comprador']), est: txt(o['estado del contrato']),
-      fin: txt(c['financiamiento']), cert: txt(c['certificacion']), cal: txt(c['calidad']), prep: txt(c['preparacion']), tcafe: txt(c['tipo cafe']), cat: txt(c['categoria']),
+      dbId: c['id'] ?? null, ica: txt(c['no. icafe']), obs: txt(c['observaciones']), fin: txt(c['financiamiento']), cert: txt(c['certificacion']), cal: txt(c['calidad']), prep: txt(c['preparacion']), tcafe: txt(c['tipo cafe']), cat: txt(c['categoria']),
       ent: txt(o['estado de entrega']), cob: txt(o['estado de cobro']), mes: mesDe(o['fecha entrega']), fent: txt(o['fecha entrega']).slice(0, 10), prom: numN(o['promedio kg por saco']),
       sacC, sacE, sacP: num(o['sacos por entregar']), kgC: num(o['kilos del contrato']), kgE: num(o['kilos entregados']), kgP: num(o['kilos por entregar']),
       fav: numN(o['kilos a favor / contra']), sug: numN(o['sacos sugeridos para cerrar']), precio: num(o['precio rieles']),
@@ -36,10 +36,11 @@ export function parseExp(resp) {
     id: txt(o['no. contrato']), comp: txt(o['comprador']), cos: txt(o['cosecha']), fecha: txt(o['fecha salida']), boleta: txt(o['boleta']), conf: txt(o['confirmacion de salida']),
     sacos: num(o['sacos']), kg: num(o['kilos']), romana: numN(o['kilos romana origen']), neto: numN(o['kilos neto entregado']),
     sob: numN(o['sobrantes kg']), fal: numN(o['faltantes kg']), dif: numN(o['diferencia romana vs comprador']), fav: numN(o['kilos a favor / contra']),
-    tot: numN(o['total $']), real: numN(o['monto real $']), guia: txt(o['estado de guia']), est: txt(o['confirmacion de salida'])
+    tot: numN(o['total $']), real: numN(o['monto real $']), guia: txt(o['estado de guia']), est: txt(o['confirmacion de salida']),
+    dbId: o['id'] ?? null, boletaN: txt(o['boleta nuestra']), guiaC: txt(o['guia comprador']), obs: txt(o['observaciones'])
   }));
-  const pagos = objetos(resp.pagos).map((o) => ({ id: txt(o['no. contrato']), fecha: txt(o['fecha pago']), monto: num(o['monto pagado $']), nota: txt(o['referencia / nota']) }));
-  const d = { contratos, entregas, pagos };
+  const pagos = objetos(resp.pagos).map((o) => ({ dbId: o['id'] ?? null, id: txt(o['no. contrato']), fecha: txt(o['fecha pago']), monto: num(o['monto pagado $']), nota: txt(o['referencia / nota']) }));
+  const d = { contratos, entregas, pagos, listas: resp.listas || {}, diasGuia: Number.isFinite(Number(resp.diasAlertaGuia)) ? Number(resp.diasAlertaGuia) : 3 };
   d.alertas = alertasDe(d);
   contratos.forEach((c) => { c.sem = semaforo(c, d.alertas.por.get(c.id) || []); c.semTxt = SEM_TXT[c.sem]; });
   return d;
@@ -56,8 +57,13 @@ export function alertasDe(d, hoy = hoyIso()) {
   const add = (id, t, nivel) => { if (!por.has(id)) por.set(id, []); por.get(id).push({ t, nivel }); lista.push({ id, t, nivel }); };
   const activos = d.contratos.filter((c) => normalizar(c.est) !== 'anulado');
   activos.forEach((c) => {
-    const sg = d.entregas.filter((e) => e.id === c.id && normalizar(e.guia) === 'entregado sin guia').length;
-    if (sg) add(c.id, `${sg} ${sg === 1 ? 'entrega sin guía' : 'entregas sin guía'}`, 'ambar');
+    const sinGuia = d.entregas.filter((e) => e.id === c.id && normalizar(e.guia) === 'entregado sin guia');
+    let leves = 0;
+    sinGuia.forEach((e) => {
+      const n = e.fecha ? difDias(hoy, e.fecha.slice(0, 10)) : 0;
+      if (e.fecha && n >= (d.diasGuia ?? 3)) add(c.id, `Salida del ${e.fecha.slice(8, 10)}/${e.fecha.slice(5, 7)} sin guía hace ${n} ${n === 1 ? 'día' : 'días'}`, 'roja'); else leves++;
+    });
+    if (leves) add(c.id, `${leves} ${leves === 1 ? 'entrega sin guía' : 'entregas sin guía'}`, 'ambar');
     if (c.fent && abierto(c)) {
       const n = difDias(c.fent, hoy);
       if (n < 0) add(c.id, `Fecha de entrega vencida hace ${-n} ${-n === 1 ? 'día' : 'días'}`, 'roja');

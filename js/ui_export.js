@@ -3,6 +3,7 @@
 import { h, clear, toast, normalizar, diaHoy, ahoraTxt, elegirVarios, elegir } from './util.js';
 import { modoPruebas, db } from './store.js';
 import { exportaciones } from './sync.js';
+import { puedeEditarExp, nuevoContrato, nuevaSalida, anotarGuia, nuevoPago } from './ui_exp_admin.js';
 import { tarjeta, etiqueta, boton, verDocumento } from './ui.js';
 import { barraCompacta, hojaFiltros, guardadosDe } from './ui_filtros.js';
 import { cargarFuentes, paginasReporte, lienzoGrafico } from './draw.js';
@@ -11,7 +12,7 @@ import { parseExp, FILTROS, filtrar, opcionesFiltro, armarReporte, reporteContra
 
 const LLAVE = 'cajuelas_exp' + (modoPruebas ? '_t' : '');
 const MIN_REFRESCO = 30;
-const leerCache = () => { try { const o = JSON.parse(localStorage.getItem(LLAVE) || 'null'); return o && o.v === 1 ? o : null; } catch { return null; } };
+const leerCache = () => { try { const o = JSON.parse(localStorage.getItem(LLAVE) || 'null'); return o && o.v === 2 ? o : null; } catch { return null; } };
 const guardarCache = (o) => { try { localStorage.setItem(LLAVE, JSON.stringify(o)); } catch { /* sin espacio: se pedirá de nuevo */ } };
 const fechaCorta = (x) => (x ? `${x.slice(8, 10)}/${x.slice(5, 7)}/${x.slice(0, 4)}` : 's/f');
 const ORDEN_SEM = { rojo: 0, ambar: 1, gris: 2, verde: 3 };
@@ -165,8 +166,17 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
       h('p', { class: 'sub' }, `Entregado ${dinero$(c.monE)} · Pagado ${dinero$(c.pag)} · Por cobrar ${dinero$(c.cobrar)}`),
       al.length ? h('p', { class: 'sub alerta-txt' }, '⚠ ' + al.map((a) => a.t).join(' · ')) : null);
   }
+  async function tras(p) { if (await p) { await cargar(true, true); redibujar(); } }
+  function barraRegistrar(idContrato = '') {
+    if (!puedeEditarExp()) return null;
+    return h('div', { class: 'acciones-exp' },
+      h('button', { type: 'button', onclick: () => tras(nuevoContrato(datos)) }, '＋ Contrato'),
+      h('button', { type: 'button', onclick: () => tras(nuevaSalida(datos, idContrato)) }, '🚚 Salida'),
+      h('button', { type: 'button', onclick: () => tras(nuevoPago(datos, idContrato)) }, '💵 Pago'));
+  }
   function pintarContratos() {
     const filas = ordenar(filtrar(datos.contratos, f.fl));
+    const br = barraRegistrar(); if (br) zona.append(br);
     zona.append(h('p', { class: 'nota' }, `${filas.length} ${filas.length === 1 ? 'contrato' : 'contratos'}${Object.keys(f.fl).length ? ' con los filtros elegidos' : ''}. Toque uno para ver su detalle.`));
     if (!filas.length) zona.append(h('p', { class: 'estado aviso' }, 'No hay contratos con estos filtros.'));
     filas.forEach((c) => zona.append(tarjetaContrato(c)));
@@ -235,6 +245,8 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
     const al = datos.alertas.por.get(c.id) || [];
     const ents = datos.entregas.filter((e) => e.id === c.id).sort((a, b) => String(a.fecha || '9999').localeCompare(String(b.fecha || '9999')));
     const pagos = datos.pagos.filter((p) => p.id === c.id).sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+    const brD = barraRegistrar(c.id); if (brD) zona.append(brD);
+    if (puedeEditarExp()) zona.append(h('div', { class: 'ev-acciones' }, h('button', { type: 'button', onclick: () => tras(nuevoContrato(datos, c)) }, '✎ Editar contrato')));
     zona.append(
       h('div', { class: 'tarjeta' },
         h('div', { class: 'fuente-cab' }, h('h3', null, punto(c.sem), c.id), chipSem(c.sem)),
@@ -255,12 +267,16 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
     else zona.append(h('div', { class: 'tarjeta' }, h('div', { class: 'linea-tiempo' }, ...ents.map((e) => {
       const dif = e.sob ? `sobrante ${dec2(e.sob)} kg` : e.fal ? `faltante ${dec2(e.fal)} kg` : '';
       return h('div', { class: 'ev' }, h('b', null, `${e.fecha ? fechaCorta(e.fecha) : 'Por entregar'} · ${ent0(e.sacos)} sacos`),
-        h('small', null, `${e.boleta ? 'Boleta ' + e.boleta + ' · ' : ''}${dec2(e.kg)} kg enviados${e.neto != null ? ' · neto ' + dec2(e.neto) + ' kg' : ''}${dif ? ' · ' + dif : ''}`),
-        h('small', null, e.guia || ''));
+        h('small', null, `${e.boletaN ? 'Boleta ' + e.boletaN : e.boleta ? 'Boleta ' + e.boleta : 'Sin boleta'}${e.guiaC ? ' · Guía ' + e.guiaC : ''} · ${dec2(e.kg)} kg enviados${e.neto != null ? ' · neto ' + dec2(e.neto) + ' kg' : ''}${dif ? ' · ' + dif : ''}`),
+        h('small', null, e.guia || ''),
+        puedeEditarExp() && e.dbId != null ? h('div', { class: 'ev-acciones' },
+          normalizar(e.guia) === 'con guia' ? null : h('button', { type: 'button', onclick: () => tras(anotarGuia(datos, e)) }, 'Anotar guía del comprador'),
+          h('button', { type: 'button', onclick: () => tras(nuevaSalida(datos, c.id, e)) }, '✎ Editar'),
+          normalizar(e.guia) === 'con guia' ? h('button', { type: 'button', onclick: () => tras(anotarGuia(datos, e)) }, 'Editar guía') : null) : null);
     }))));
     zona.append(h('div', { class: 'titulo-grupo' }, `Pagos (${pagos.length})`));
     if (!pagos.length) zona.append(h('p', { class: 'nota' }, 'Todavía no hay pagos registrados.'));
-    else zona.append(h('div', { class: 'tarjeta' }, ...pagos.map((p) => h('p', { class: 'fila-pago' }, `${fechaCorta(p.fecha)} · ${dinero$(p.monto)}${p.nota ? ' · ' + p.nota : ''}`))));
+    else zona.append(h('div', { class: 'tarjeta' }, ...pagos.map((p) => h('p', { class: 'fila-pago' }, `${fechaCorta(p.fecha)} · ${dinero$(p.monto)}${p.nota ? ' · ' + p.nota : ''}`, puedeEditarExp() && p.dbId != null ? h('button', { type: 'button', class: 'btn-mini', onclick: () => tras(nuevoPago(datos, c.id, p)) }, ' ✎') : null))));
   }
 
   // ---- Tablas (reportes con gráficos y PDF) ----
@@ -301,7 +317,7 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
 
   // ---- Datos ----
   function usar(o) { crudo = o; datos = parseExp(o); error = ''; }
-  async function cargar(forzar) {
+  async function cargar(forzar, silencio = false) {
     if (cargando) return;
     const cache = leerCache();
     if (!forzar && cache && Date.now() - cache.t < MIN_REFRESCO * 60000) { if (!datos) usar(cache); redibujar(); return; }
@@ -312,11 +328,11 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
     if (r.error) {
       error = r.error;
       if (cache && !datos) usar(cache);
-      if (forzar) toast('Exportaciones: ' + r.error + (datos ? '\nSe muestran los últimos datos guardados.' : ''), 7000);
+      if (forzar && !silencio) toast('Exportaciones: ' + r.error + (datos ? '\nSe muestran los últimos datos guardados.' : ''), 7000);
     } else {
-      const o = { v: 1, t: Date.now(), resumen: r.resumen, contratos: r.contratos, entregas: r.entregas, pagos: r.pagos, actualizado: r.actualizado };
+      const o = { v: 2, t: Date.now(), resumen: r.resumen, contratos: r.contratos, entregas: r.entregas, pagos: r.pagos, actualizado: r.actualizado, listas: r.listas, diasAlertaGuia: r.diasAlertaGuia };
       guardarCache(o); usar(o);
-      if (forzar) toast('Datos de Exportaciones actualizados.');
+      if (forzar && !silencio) toast('Datos de Exportaciones actualizados.');
     }
     redibujar();
   }

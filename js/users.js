@@ -67,6 +67,18 @@ async function verificador(nombre, hash) {
   const b = await crypto.subtle.digest('SHA-256', enc.encode(`v|${sal}|${String(nombre).trim().toLowerCase()}|${hash}`));
   return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
+/** Cambia el PIN del usuario que tiene la sesión abierta. Devuelve null si salió bien o el texto del error. */
+export async function cambiarPin(actual, nuevo) {
+  const ses = db.get('sesion', null);
+  if (!ses || !ses.nombre) return 'No hay una sesión abierta.';
+  if (!/^\d{4,12}$/.test(String(nuevo))) return 'El PIN nuevo debe tener de 4 a 12 números.';
+  if (String(nuevo) === String(actual)) return 'El PIN nuevo debe ser distinto al actual.';
+  const hA = await huella(ses.nombre, actual), hN = await huella(ses.nombre, nuevo);
+  const r = await postJson('', { action: 'cambiarPin', actual: hA, nuevo: hN }, 20000);
+  if (!r.ok) return r.message || 'No se pudo cambiar el PIN.';
+  db.set(llaveVerif(ses.nombre), { v: await verificador(ses.nombre, hN), perfil: ses.perfil });
+  return null;
+}
 /** Entrada con el servidor nuevo: el PIN se verifica en el servidor. Sin Internet solo entra quien ya entró antes en este teléfono. */
 async function entrarSupa(nombre, pin) {
   const nom = String(nombre).trim();
@@ -116,6 +128,15 @@ export async function actualizarUsuarios(forzar = false) {
     const antesS = JSON.stringify(lista());
     db.set('users_list', nuevaS);
     if (JSON.stringify(nuevaS) !== antesS) avisar();
+    // Permisos al día: si el administrador cambió el rol o los permisos de esta persona, llega aquí.
+    const ses = db.get('sesion', null);
+    if (ses && ses.token) {
+      const rp = await postJson('', { action: 'perfil' }, 20000);
+      if (rp.ok && rp.json && rp.json.usuario && rp.json.usuario.nombre) {
+        const antesP = JSON.stringify(ses.perfil);
+        if (JSON.stringify(rp.json.usuario) !== antesP) { db.set('sesion', { ...ses, perfil: rp.json.usuario }); avisar(); }
+      }
+    }
     return { ok: true };
   }
   const { url, token } = syncCfg();
