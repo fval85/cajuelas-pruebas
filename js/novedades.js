@@ -1,5 +1,8 @@
 // Novedades de cada versión (se muestran en Ajustes > Novedades de la versión).
 export const NOVEDADES = [
+  { v: '2.12.0-pruebas4', t: [
+    'COPIA DE PRUEBAS · tramo 4: Históricos y Exportaciones ya viven dentro del servidor nuevo (ya no hace falta ningún Excel aparte). Reportes, Ventas de exportación y «Pasar día a Históricos» leen y escriben en la misma base.'
+  ] },
   { v: '2.12.0-pruebas3', t: [
     'COPIA DE PRUEBAS · tramo 3: Diario (recibos y su resumen por día o rango) y Boletos (movimientos, anulaciones e inventario) conectados al servidor nuevo, con permisos revisados en el servidor.'
   ] },
