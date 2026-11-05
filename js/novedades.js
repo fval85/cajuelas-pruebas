@@ -1,5 +1,8 @@
 // Novedades de cada versión (se muestran en Ajustes > Novedades de la versión).
 export const NOVEDADES = [
+  { v: '2.12.0-pruebas2', t: [
+    'COPIA DE PRUEBAS · tramo 2: Registro conectado al servidor nuevo (guardar comprobantes y anulaciones sin duplicar, resumen del día y corrección de fecha para administradores, con auditoría). Diario y Boletos siguen pendientes.'
+  ] },
   { v: '2.12.0-pruebas1', t: [
     'COPIA DE PRUEBAS con el servidor nuevo (Supabase): entrada con usuario y PIN verificados en el servidor, catálogo y configuración. Registro, Diario y Boletos se conectan en los siguientes tramos.'
   ] },
