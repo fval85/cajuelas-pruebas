@@ -1,5 +1,8 @@
 // Novedades de cada versión (se muestran en Ajustes > Novedades de la versión).
 export const NOVEDADES = [
+  { v: '2.12.0-pruebas3', t: [
+    'COPIA DE PRUEBAS · tramo 3: Diario (recibos y su resumen por día o rango) y Boletos (movimientos, anulaciones e inventario) conectados al servidor nuevo, con permisos revisados en el servidor.'
+  ] },
   { v: '2.12.0-pruebas2', t: [
     'COPIA DE PRUEBAS · tramo 2: Registro conectado al servidor nuevo (guardar comprobantes y anulaciones sin duplicar, resumen del día y corrección de fecha para administradores, con auditoría). Diario y Boletos siguen pendientes.'
   ] },
