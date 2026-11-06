@@ -270,3 +270,5 @@ details.mas-datos summary { font-weight: 700; color: var(--verde); padding: 8px 
 .chip-est.verde { background: #dcfce7; color: var(--verde); } .chip-est.ambar { background: #fef3c7; color: #92400e; } .chip-est.gris { background: #e5e7eb; color: #374151; }
 .casilla { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-weight: 600; }
 .casilla input { width: 20px; height: 20px; }
+/* En computadora, los reportes anchos se ajustan al ancho de la ventana (en el teléfono siguen con desplazamiento lateral). */
+@media (pointer: fine) and (min-width: 700px) { .visor.ancho:not(.amp) .hoja { width: 100%; max-width: 900px; margin: 0 auto 10px; } }

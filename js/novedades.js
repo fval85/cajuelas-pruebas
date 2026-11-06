@@ -1,5 +1,14 @@
 // Novedades de cada versión (se muestran en Ajustes > Novedades de la versión).
 export const NOVEDADES = [
+  { v: '2.13.0', t: [
+    'Ajustes › Personas con tarjeta (administradores): agregar personas una por una, pegando filas desde Excel o subiendo un archivo Excel/CSV, eligiendo la sociedad y los usuarios.',
+    'Vista previa antes de guardar: muestra las nuevas, las que ya existían (no se duplican) y las que traen error (tarjeta incompleta, usuario o sociedad que no existe). El código de cada persona se asigna solo.',
+    'Dentro de cada persona se puede corregir nombre o tarjeta, quitar la deducción cuando ya se cobró, o quitarla de la lista.'
+  ] },
+  { v: '2.12.3', t: [
+    'En computadora, la vista del PDF (contratos, reportes, tiquetes) tiene el botón «⬇ Descargar PDF» para guardarlo directo en Descargas, y el reporte ancho se ve completo en la ventana.',
+    'En el teléfono todo sigue igual.'
+  ] },
   { v: '2.12.2', t: [
     'Contratos de exportación: la entrega prevista es un mes (por ejemplo nov-26). La alerta de «entrega vencida» solo sale cuando el mes termina.',
     'Financiamiento solo SI o NO. En los contratos financiados el banco recibe todo y nos devuelve un porcentaje (30 % por defecto, editable por contrato): el contrato, cada entrega y «Por cobrar» muestran lo que nos toca y lo que es del banco.',
