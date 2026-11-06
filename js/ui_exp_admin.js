@@ -19,7 +19,7 @@ function campo(c, listas, estado) {
     const pintarOpciones = (sel) => {
       el.replaceChildren();
       if (!c.obligatorio) el.append(h('option', { value: '' }, '—'));
-      const ops = [...(listas[c.lista] || [])];
+      const ops = (listas[c.lista] || []).filter((o) => !/^[-–—\s]*$/.test(String(o)));
       const s0 = sel || '';
       if (s0 && !ops.includes(s0)) ops.push(s0);
       ops.forEach((o) => el.append(h('option', { value: o }, o)));
@@ -37,12 +37,14 @@ function campo(c, listas, estado) {
     });
   } else if (c.tipo === 'fecha') {
     el = h('input', { class: 'campo', type: 'date', value: c.valor || '' });
+  } else if (c.tipo === 'mes') {
+    el = h('input', { class: 'campo', type: 'month', value: (c.valor || '').slice(0, 7) });
   } else {
     el = h('input', { class: 'campo' + (c.tipo === 'num' ? '' : ''), type: 'text', value: c.valor ?? '', placeholder: c.placeholder || '', inputmode: c.tipo === 'num' ? 'decimal' : undefined, autocomplete: 'off', autocapitalize: 'none' });
   }
   if (c.deshabilitado) el.disabled = true;
   const caja = h('div', { class: 'campo-caja' }, etiqueta, el);
-  return { c, el, caja, leer: () => (c.tipo === 'num' ? el.value.trim() : el.value.trim()) };
+  return { c, el, caja, leer: () => (c.tipo === 'mes' ? (el.value ? el.value + '-01' : '') : el.value.trim()) };
 }
 
 /**
@@ -57,7 +59,11 @@ function hoja({ titulo, campos, listas = {}, guardar, ok = 'Guardar', nota = nul
     const por = Object.fromEntries(cs.map((x) => [x.c.k, x]));
     const vals = () => Object.fromEntries(cs.map((x) => [x.c.k, x.leer()]));
     const cajaNota = nota ? h('p', { class: 'calc-nota' }) : null;
-    const act = () => { if (cajaNota) { const t = nota(vals()); cajaNota.textContent = t || ''; cajaNota.hidden = !t; } };
+    const act = () => {
+      const vv = vals();
+      cs.forEach((x) => { if (x.c.visibleSi) x.caja.hidden = !x.c.visibleSi(vv); });
+      if (cajaNota) { const t = nota(vv); cajaNota.textContent = t || ''; cajaNota.hidden = !t; }
+    };
     const filas = [];
     let par = [];
     campos.forEach((c, i) => {
@@ -110,13 +116,22 @@ export function nuevoContrato(datos, c = null) {
       { k: 'tipo', etiqueta: 'Tipo', tipo: 'lista', lista: 'tipo', valor: c ? c.tipo : 'EXP', obligatorio: true, mitad: true, puedeAgregar: puede('todos') },
       { k: 'precio', etiqueta: 'Precio rieles $', tipo: 'num', valor: c && c.precio != null ? String(c.precio).replace('.', ',') : '', mitad: true },
       { k: 'sacos', etiqueta: 'Sacos', tipo: 'num', valor: c ? String(c.sacC) : '', mitad: true },
-      { k: 'fecha_entrega', etiqueta: 'Fecha de entrega prevista', tipo: 'fecha', valor: c ? c.fent : '' }
+      { k: 'fecha_entrega', etiqueta: 'Mes de entrega previsto', tipo: 'mes', valor: c ? c.fent : '' }
     ],
-    nota: (x) => { const s = num(x.sacos), p = num(x.precio); return Number.isFinite(s) ? `= ${miles(s * QQ_SACO, 1)} qq · ${miles(s * KG_SACO)} kg${Number.isFinite(p) ? ' · ' + dinero(p * s * QQ_SACO) : ''}` : ''; },
+    nota: (x) => {
+      const s = num(x.sacos), p = num(x.precio);
+      if (!Number.isFinite(s)) return '';
+      const total = Number.isFinite(p) ? p * s * QQ_SACO : NaN;
+      let t = `= ${miles(s * QQ_SACO, 1)} qq · ${miles(s * KG_SACO)} kg${Number.isFinite(total) ? ' · ' + dinero(total) : ''}`;
+      const pc = num(x.pct_nuestro);
+      if (x.financiamiento === 'SI' && Number.isFinite(total) && Number.isFinite(pc)) t += `\nFinanciado: nos tocan ${dinero(total * pc / 100)} (${miles(pc, 1)} %) · del banco ${dinero(total * (100 - pc) / 100)}`;
+      return t;
+    },
     masDatos: [
       { k: 'estado', etiqueta: 'Estado del contrato', tipo: 'lista', lista: 'estado', valor: c ? c.est : 'Inscrito', obligatorio: true, puedeAgregar: puede('todos') },
-      { k: 'financiamiento', etiqueta: 'Financiamiento', tipo: 'lista', lista: 'financiamiento', valor: v('fin'), mitad: true, puedeAgregar: puede('todos') },
+      { k: 'financiamiento', etiqueta: 'Financiamiento', tipo: 'lista', lista: 'financiamiento', valor: v('fin'), mitad: true },
       { k: 'certificacion', etiqueta: 'Certificación', tipo: 'lista', lista: 'certificacion', valor: v('cert'), mitad: true, puedeAgregar: puede('todos') },
+      { k: 'pct_nuestro', etiqueta: 'Porcentaje que nos devuelve el banco %', tipo: 'num', valor: c && c.pctC != null ? String(c.pctC).replace('.', ',') : '30', visibleSi: (x) => x.financiamiento === 'SI' },
       { k: 'icafe', etiqueta: 'No. Icafe', tipo: 'texto', valor: v('ica') },
       { k: 'calidad', etiqueta: 'Calidad', tipo: 'lista', lista: 'calidad', valor: v('cal'), mitad: true, puedeAgregar: puede('todos') },
       { k: 'preparacion', etiqueta: 'Preparación', tipo: 'lista', lista: 'preparacion', valor: v('prep'), mitad: true, puedeAgregar: puede('todos') },

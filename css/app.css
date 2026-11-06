@@ -256,7 +256,7 @@ body { touch-action: manipulation; }
 .campo-caja { margin-bottom: 8px; }
 .campo-caja .etiqueta { display: block; margin-bottom: 3px; }
 .dos-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.calc-nota { background: #ecfdf5; border: 1.5px dashed var(--verde); border-radius: 10px; padding: 8px 10px; color: var(--verde); font-weight: 700; font-size: 14px; margin: 4px 0 10px; }
+.calc-nota { white-space: pre-line; background: #ecfdf5; border: 1.5px dashed var(--verde); border-radius: 10px; padding: 8px 10px; color: var(--verde); font-weight: 700; font-size: 14px; margin: 4px 0 10px; }
 details.mas-datos { margin: 6px 0; }
 details.mas-datos summary { font-weight: 700; color: var(--verde); padding: 8px 0; cursor: pointer; }
 .acciones-exp { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 10px; }

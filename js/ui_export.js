@@ -8,11 +8,11 @@ import { tarjeta, etiqueta, boton, verDocumento } from './ui.js';
 import { barraCompacta, hojaFiltros, guardadosDe } from './ui_filtros.js';
 import { cargarFuentes, paginasReporte, lienzoGrafico } from './draw.js';
 import { celdaTxt } from './rep_calc.js';
-import { parseExp, FILTROS, filtrar, opcionesFiltro, armarReporte, reporteContrato, estadoCuenta, VISTAS, DIMENSIONES, MEDIDAS, MEDIDAS_INI, GRAFICOS, grafIni, dinero$, dec2, ent0, SEM_TXT, mesTxt, hoyIso } from './exp_calc.js';
+import { parseExp, FILTROS, filtrar, opcionesFiltro, armarReporte, reporteContrato, estadoCuenta, VISTAS, DIMENSIONES, MEDIDAS, MEDIDAS_INI, GRAFICOS, grafIni, dinero$, dec2, ent0, SEM_TXT, mesTxt, mesCorto, hoyIso } from './exp_calc.js';
 
 const LLAVE = 'cajuelas_exp' + (modoPruebas ? '_t' : '');
 const MIN_REFRESCO = 30;
-const leerCache = () => { try { const o = JSON.parse(localStorage.getItem(LLAVE) || 'null'); return o && o.v === 2 ? o : null; } catch { return null; } };
+const leerCache = () => { try { const o = JSON.parse(localStorage.getItem(LLAVE) || 'null'); return o && o.v === 3 ? o : null; } catch { return null; } };
 const guardarCache = (o) => { try { localStorage.setItem(LLAVE, JSON.stringify(o)); } catch { /* sin espacio: se pedirá de nuevo */ } };
 const fechaCorta = (x) => (x ? `${x.slice(8, 10)}/${x.slice(5, 7)}/${x.slice(0, 4)}` : 's/f');
 const ORDEN_SEM = { rojo: 0, ambar: 1, gris: 2, verde: 3 };
@@ -160,7 +160,7 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
     const al = datos.alertas.por.get(c.id) || [];
     return h('div', { class: 'tarj-contrato', role: 'button', tabindex: '0', onclick: () => { detalleId = c.id; redibujar(); window.scrollTo(0, 0); } },
       h('h3', null, h('span', null, punto(c.sem), c.id), chipSem(c.sem)),
-      h('p', { class: 'sub' }, `${c.comp} · ${c.tipo} · ${c.cos}`),
+      h('p', { class: 'sub' }, `${c.comp} · ${c.tipo} · ${c.cos}${c.finan ? ' · Financiado ' + ent0(c.pct) + ' %' : ''}`),
       barraProg(c),
       h('p', { class: 'sub' }, `${ent0(c.sacE)} de ${ent0(c.sacC)} sacos entregados · faltan ${ent0(c.sacP)}`),
       h('p', { class: 'sub' }, `Entregado ${dinero$(c.monE)} · Pagado ${dinero$(c.pag)} · Por cobrar ${dinero$(c.cobrar)}`),
@@ -209,7 +209,7 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
       const l = filas.filter((c) => ['por entregar', 'entrega parcial'].includes(normalizar(c.ent))).sort((a, b) => (a.fent || '9999').localeCompare(b.fent || '9999') || a.id.localeCompare(b.id, 'es', { numeric: true }));
       zona.append(h('p', { class: 'nota' }, `${l.length} contratos con café pendiente · ${ent0(l.reduce((t, c) => t + c.sacP, 0))} sacos por entregar`));
       if (!l.length) zona.append(h('p', { class: 'estado aviso' }, 'No hay entregas pendientes.'));
-      l.forEach((c) => zona.append(filaSeg(c, `${ent0(c.sacP)} sacos`, `entrega prevista ${fechaCorta(c.fent)}`)));
+      l.forEach((c) => zona.append(filaSeg(c, `${ent0(c.sacP)} sacos`, `entrega prevista ${c.fent ? mesCorto(c.fent) : 's/f'}`)));
     } else if (sub === 'cobrar') {
       const l = filas.filter((c) => c.cobrar > 0.005).sort((a, b) => b.cobrar - a.cobrar);
       const porComp = new Map();
@@ -250,7 +250,7 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
     zona.append(
       h('div', { class: 'tarjeta' },
         h('div', { class: 'fuente-cab' }, h('h3', null, punto(c.sem), c.id), chipSem(c.sem)),
-        h('p', { class: 'sub' }, `${c.comp} · ${c.tipo} · cosecha ${c.cos}${c.fent ? ' · entrega prevista ' + fechaCorta(c.fent) : ''}`),
+        h('p', { class: 'sub' }, `${c.comp} · ${c.tipo} · cosecha ${c.cos}${c.fent ? ' · entrega prevista ' + mesCorto(c.fent) : ''}${c.finan ? ' · financiado' : ''}`),
         barraProg(c),
         h('p', { class: 'sub' }, `${ent0(c.sacE)} de ${ent0(c.sacC)} sacos entregados (${c.sacC ? Math.round(c.sacE / c.sacC * 100) : 0}%) · Entrega: ${c.ent || '—'} · Cobro: ${c.cob || '—'}`)),
       ...al.map((a) => h('div', { class: 'alerta' + (a.nivel === 'roja' ? ' roja' : '') }, h('span', { 'aria-hidden': 'true' }, a.nivel === 'roja' ? '⛔' : '⚠'), h('span', null, a.t))),
@@ -258,8 +258,15 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
         par('Sacos del contrato', ent0(c.sacC)), par('Sacos por entregar', ent0(c.sacP)),
         par('Kilos entregados', dec2(c.kgE)), par('Kilos por entregar', dec2(c.kgP)),
         par('Monto del contrato', dinero$(c.monC)), par('Monto entregado', dinero$(c.monE)),
-        par('Pagado', dinero$(c.pag)), par('Por cobrar', dinero$(c.cobrar)),
+        par('Pagado', dinero$(c.pag)), par(c.finan ? 'Por cobrar (nos toca)' : 'Por cobrar', dinero$(c.cobrar)),
         par('Kilos a favor / contra', c.fav == null ? '—' : dec2(c.fav)), par('Efecto en $', c.efe == null ? '—' : dinero$(c.efe)))),
+      c.finan ? h('div', { class: 'tarjeta' }, h('b', null, `Financiamiento · nos toca el ${dec2(c.pct)} %`),
+        h('p', { class: 'sub' }, 'El banco recibe el pago completo y nos devuelve nuestro porcentaje. El resto es del banco: solo de referencia.'),
+        h('div', { class: 'pares' },
+          par('Monto del contrato', dinero$(c.monC)), par(`Nuestro ${dec2(c.pct)} %`, dinero$(c.monC * c.pct / 100)),
+          par(`Del banco ${dec2(100 - c.pct)} %`, dinero$(c.monC * (100 - c.pct) / 100)), par('Entregado · nos toca', dinero$(c.monN)),
+          par('Entregado · del banco', dinero$(c.monB)), par('Devuelto por el banco', dinero$(c.pag)),
+          par('Por cobrar real', dinero$(c.cobrar)))) : null,
       h('div', { class: 'tarjeta' }, h('b', null, 'Para cerrar el contrato'),
         h('div', { class: 'pares' }, par('Sacos sugeridos', c.sug == null ? '—' : ent0(c.sug)), par('Promedio kg por saco', c.prom == null ? '—' : dec2(c.prom)))),
       h('div', { class: 'titulo-grupo' }, `Entregas (${ents.length})`));
@@ -269,6 +276,7 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
       return h('div', { class: 'ev' }, h('b', null, `${e.fecha ? fechaCorta(e.fecha) : 'Por entregar'} · ${ent0(e.sacos)} sacos`),
         h('small', null, `${e.boletaN ? 'Boleta ' + e.boletaN : e.boleta ? 'Boleta ' + e.boleta : 'Sin boleta'}${e.guiaC ? ' · Guía ' + e.guiaC : ''} · ${dec2(e.kg)} kg enviados${e.neto != null ? ' · neto ' + dec2(e.neto) + ' kg' : ''}${dif ? ' · ' + dif : ''}`),
         h('small', null, e.guia || ''),
+        c.finan && e.real != null ? h('small', null, `Nos toca ${dinero$(e.real * c.pct / 100)} (${dec2(c.pct)} %) · del banco ${dinero$(e.real * (100 - c.pct) / 100)}`) : null,
         puedeEditarExp() && e.dbId != null ? h('div', { class: 'ev-acciones' },
           normalizar(e.guia) === 'con guia' ? null : h('button', { type: 'button', onclick: () => tras(anotarGuia(datos, e)) }, 'Anotar guía del comprador'),
           h('button', { type: 'button', onclick: () => tras(nuevaSalida(datos, c.id, e)) }, '✎ Editar'),
@@ -330,7 +338,7 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
       if (cache && !datos) usar(cache);
       if (forzar && !silencio) toast('Exportaciones: ' + r.error + (datos ? '\nSe muestran los últimos datos guardados.' : ''), 7000);
     } else {
-      const o = { v: 2, t: Date.now(), resumen: r.resumen, contratos: r.contratos, entregas: r.entregas, pagos: r.pagos, actualizado: r.actualizado, listas: r.listas, diasAlertaGuia: r.diasAlertaGuia };
+      const o = { v: 3, t: Date.now(), resumen: r.resumen, contratos: r.contratos, entregas: r.entregas, pagos: r.pagos, actualizado: r.actualizado, listas: r.listas, diasAlertaGuia: r.diasAlertaGuia };
       guardarCache(o); usar(o);
       if (forzar && !silencio) toast('Datos de Exportaciones actualizados.');
     }
