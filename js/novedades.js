@@ -1,5 +1,10 @@
 // Novedades de cada versión (se muestran en Ajustes > Novedades de la versión).
 export const NOVEDADES = [
+  { v: '2.15.0', t: [
+    'Reportes › Café en fruta · CAPRIS (administradores): control simple de lo entregado a Capris. Muestra las fanegas entregadas por tipo contra el máximo del contrato («Faltan …») y las fanegas de cada finca.',
+    'Cada recibo lleva Fecha, Tipo, Recibo, Finca, Sociedad y Cajuelas; las fanegas se calculan solas (cajuelas ÷ 20). Se agregan a mano, pegando desde Excel o subiendo la plantilla, siempre con vista previa. Un mismo recibo puede repartirse entre fincas.',
+    'El máximo de fanegas de cada tipo se puede cambiar si Capris amplía el contrato. Los recibos se pueden editar o anular.'
+  ] },
   { v: '2.14.0', t: [
     'Personas con tarjeta: el administrador puede asignar una persona a más usuarios o quitársela a alguno (dentro de la persona, «Usuarios que la tienen»).',
     'En la lista de un usuario, «Seleccionar varias» permite copiar o pasar varias personas a otro usuario de una vez; reciben código nuevo y los recibos anteriores se conservan.'
