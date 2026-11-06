@@ -13,13 +13,18 @@ const plural = (n, a, b) => `${n} ${n === 1 ? a : b}`;
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /** Texto pegado desde Excel → [{nombre, tarjeta, deduccion}]. Acepta tabuladores, «;» o «nombre 5421…» seguido. */
-export function parsearPegado(texto) {
+export function parsearPegado(texto, conocidos = null) {
   const out = [];
   String(texto || '').split(/\r?\n/).forEach((linea) => {
     if (!linea.trim()) return;
     let c = linea.split('\t').map((x) => x.trim());
     if (c.length < 2 && linea.includes(';')) c = linea.split(';').map((x) => x.trim());
-    if (/nombre/i.test(c[0]) && /tarjeta/i.test(linea)) return;
+    if (/tarjeta/i.test(linea) && !/\d{8}/.test(linea)) return; // encabezado
+    // Filas completas copiadas de la plantilla: Usuario ⇥ Sociedad ⇥ Nombre ⇥ Tarjeta ⇥ Deducción
+    if (conocidos && c.length >= 4) {
+      const us = conocidos.usuarios.find((u) => norm(u) === norm(c[0])), so = conocidos.sociedades.find((x) => norm(x) === norm(c[1]));
+      if (us && so) { out.push({ usuario: us, sociedad: so, nombre: c[2], tarjeta: soloDig(c[3]), deduccion: c[4] || '' }); return; }
+    }
     let ti = c.findIndex((x, i) => i > 0 && /^\d{16}$/.test(soloDig(x)));
     if (ti < 0) ti = c.findIndex((x, i) => i > 0 && /^\d{8,}$/.test(soloDig(x)));
     if (ti > 0) { out.push({ nombre: c.slice(0, ti).join(' '), tarjeta: soloDig(c[ti]), deduccion: c[ti + 1] || '' }); return; }
@@ -74,7 +79,7 @@ export function pintarPersonas({ raiz, irInicio }) {
     raiz.append(q, h('p', { class: 'nota' }, `${plural(total(), 'registro', 'registros')} · cosecha ${res.cosecha}`), zona);
     const pintarGrupos = () => {
       clear(zona);
-      res.grupos.forEach((g) => zona.append(h('div', { class: 'fila-aj fila-usuario', role: 'button', tabindex: '0', onclick: () => verLista(`${g.usuario} · ${corta(g.sociedad)}`, (p) => p.sociedad === g.sociedad && p.items.some((i) => i.usuario === g.usuario)) },
+      res.grupos.forEach((g) => zona.append(h('div', { class: 'fila-aj fila-usuario', role: 'button', tabindex: '0', onclick: () => verLista(`${g.usuario} · ${corta(g.sociedad)}`, (p) => p.sociedad === g.sociedad && p.items.some((i) => i.usuario === g.usuario), g.usuario) },
         h('span', { class: 'tx' }, g.usuario, h('small', null, corta(g.sociedad))), h('b', null, String(g.n)))));
     };
     q.addEventListener('input', () => {
@@ -91,12 +96,45 @@ export function pintarPersonas({ raiz, irInicio }) {
       p.deduccion != null ? chip('Deducción', 'ambar') : null)));
     if (ps.length > 200) zona.append(h('p', { class: 'nota' }, `Mostrando 200 de ${ps.length}. Escriba para filtrar.`));
   }
-  function verLista(titulo, filtro) {
+  function verLista(titulo, filtro, origen = '') {
     clear(raiz);
     raiz.append(cabSub(titulo, inicio));
     const ps = lista.filter(filtro);
     raiz.append(h('p', { class: 'nota' }, plural(ps.length, 'persona', 'personas')));
-    const zona = h('div'); raiz.append(zona); pintarPersonas2(zona, ps);
+    const sel = new Set(); let modo = false;
+    const barra = h('div'), zona = h('div');
+    raiz.append(barra, zona);
+    const clave = (p) => p.sociedad + '|' + p.tarjeta;
+    const pintar = () => {
+      clear(barra); clear(zona);
+      if (!modo) {
+        barra.append(h('button', { type: 'button', class: 'btn-texto ancho-total', onclick: () => { modo = true; pintar(); } }, '☑ Seleccionar varias (copiar o pasar a otro usuario)'));
+        pintarPersonas2(zona, ps); return;
+      }
+      const dest = h('select', { class: 'campo selec' }, ...res.usuarios.filter((u) => u !== origen).map((u) => h('option', { value: u }, u)));
+      const cuenta = h('p', { class: 'nota' });
+      const act = () => { cuenta.textContent = `${plural(sel.size, 'persona elegida', 'personas elegidas')}`; };
+      const ejecutar = async (pasar) => {
+        if (!sel.size) return toast('Elija al menos una persona.');
+        const elegidas = ps.filter((p) => sel.has(clave(p)));
+        const txt = pasar ? `Pasar ${plural(elegidas.length, 'persona', 'personas')} de ${origen} a ${dest.value}` : `Copiar ${plural(elegidas.length, 'persona', 'personas')} a ${dest.value}`;
+        if (!(await confirmar(txt, pasar ? `Dejan de salirle a ${origen} y le salen a ${dest.value} con código nuevo. Los recibos anteriores se conservan.` : `${dest.value} las recibe con código nuevo; ${origen || 'quien ya las tenía'} las conserva.`, { si: pasar ? 'Pasar' : 'Copiar' }))) return;
+        const r = await personasAdmin('asignar', { personas: elegidas.map((p) => ({ sociedad: p.sociedad, tarjeta: p.tarjeta })), agregar: [dest.value], quitar: pasar ? [origen] : [] });
+        toast(r.message, 5000);
+        if (r.ok) { await cargar0(); verLista(titulo, filtro, origen); }
+      };
+      barra.append(h('label', { class: 'etiqueta' }, 'Destino'), dest, cuenta,
+        h('button', { type: 'button', class: 'btn-texto ancho-total', onclick: () => { if (sel.size === ps.length) sel.clear(); else ps.forEach((p) => sel.add(clave(p))); pintar(); } }, sel.size === ps.length ? 'Quitar selección' : 'Seleccionar todas'),
+        h('button', { type: 'button', class: 'btn-texto primario ancho-total', onclick: () => ejecutar(false) }, 'Copiar al destino'),
+        origen ? h('button', { type: 'button', class: 'btn-texto primario ancho-total', onclick: () => ejecutar(true) }, 'Pasar al destino (quitar de ' + origen + ')') : null,
+        h('button', { type: 'button', class: 'btn-texto ancho-total', onclick: () => { modo = false; sel.clear(); pintar(); } }, 'Cancelar selección'));
+      act();
+      ps.forEach((p) => {
+        const cb = h('input', { type: 'checkbox', checked: sel.has(clave(p)), onchange: () => { if (cb.checked) sel.add(clave(p)); else sel.delete(clave(p)); act(); } });
+        zona.append(h('label', { class: 'casilla' }, cb, h('span', { class: 'tx' }, ' ' + p.nombre, h('small', null, ` ${mascara(p.tarjeta)} · ${p.items.map((x) => x.usuario).join(', ')}`))));
+      });
+    };
+    pintar();
   }
 
   // ---------- Elegir sociedad y usuarios ----------
@@ -148,11 +186,12 @@ export function pintarPersonas({ raiz, irInicio }) {
     const area = h('textarea', { class: 'campo', rows: '8', placeholder: 'Pegue aquí las filas copiadas de Excel:\nNombre ⇥ Tarjeta ⇥ Deducción (opcional)', autocomplete: 'off', spellcheck: 'false' });
     const btn = h('button', { type: 'button', class: 'btn-texto primario ancho-total', onclick: async () => {
       const us = [...dest.marcados];
-      if (!us.length) return toast('Marque al menos un usuario.');
-      const ps = parsearPegado(area.value);
+      const ps = parsearPegado(area.value, { usuarios: res.usuarios, sociedades: res.sociedades });
       if (!ps.length) return toast('Pegue primero las filas de Excel.');
       const filas = [];
-      ps.forEach((p, g) => us.forEach((u) => filas.push({ ...p, usuario: u, sociedad: dest.sel.value, g })));
+      if (!us.length && ps.some((p) => !p.usuario)) return toast('Marque al menos un usuario.');
+      // Las filas que ya traen usuario y sociedad (copiadas de la plantilla) se respetan tal cual.
+      ps.forEach((p, g) => { if (p.usuario) filas.push({ ...p, g }); else us.forEach((u) => filas.push({ ...p, usuario: u, sociedad: dest.sel.value, g })); });
       await revisar(filas, ps.length, pegar);
     } }, 'Ver vista previa');
     raiz.append(...dest.el, h('label', { class: 'etiqueta' }, 'Pegue aquí: Nombre ⇥ Tarjeta ⇥ Deducción (opcional)'), area, btn,
@@ -242,7 +281,21 @@ export function pintarPersonas({ raiz, irInicio }) {
       const r = await personasAdmin('editar', { ids, nombre: nombre.value, tarjeta: tarjeta.value, deduccion: dedTxt });
       toast(r.message, 4000); if (r.ok) await cargar();
     };
-    raiz.append(h('div', { class: 'tarjeta' }, h('b', null, corta(p.sociedad)), ...p.items.map((i) => h('p', { class: 'nota' }, `${i.usuario} · código ${i.codigo}`))),
+    const marcados = new Set(p.items.map((i) => i.usuario)); const actuales = [...marcados];
+    const cajaUs = h('div', { class: 'tarjeta' }, h('b', null, 'Usuarios que la tienen'), ...res.usuarios.map((u) => {
+      const cb = h('input', { type: 'checkbox', checked: marcados.has(u), onchange: () => { if (cb.checked) marcados.add(u); else marcados.delete(u); } });
+      const it = p.items.find((i) => i.usuario === u);
+      return h('label', { class: 'casilla' }, cb, ' ', u, it ? h('small', null, ` · código ${it.codigo}`) : null);
+    }),
+      h('button', { type: 'button', class: 'btn-texto primario ancho-total', onclick: async () => {
+        if (!marcados.size) return toast('Marque al menos un usuario, o use «Quitar de la lista».');
+        const agregar = [...marcados].filter((u) => !actuales.includes(u)), quitar = actuales.filter((u) => !marcados.has(u));
+        if (!agregar.length && !quitar.length) return toast('No hay cambios en los usuarios.');
+        if (quitar.length && !(await confirmar('Quitar usuarios', `Deja de salirle a ${quitar.join(', ')}. Sus recibos anteriores se conservan.`, { si: 'Guardar' }))) return;
+        const r = await personasAdmin('asignar', { personas: [{ sociedad: p.sociedad, tarjeta: p.tarjeta }], agregar, quitar });
+        toast(r.message, 4000); if (r.ok) await cargar();
+      } }, 'Guardar usuarios'));
+    raiz.append(h('div', { class: 'tarjeta' }, h('b', null, corta(p.sociedad))), cajaUs,
       h('label', { class: 'etiqueta' }, 'Nombre y apellidos'), nombre, h('label', { class: 'etiqueta' }, 'Tarjeta'), tarjeta, h('label', { class: 'etiqueta' }, 'Deducción'), ded,
       p.deduccion != null ? h('button', { type: 'button', class: 'btn-texto ancho-total', onclick: () => guardar('') }, 'Quitar deducción (ya se cobró)') : null,
       h('button', { type: 'button', class: 'btn-texto primario ancho-total', onclick: () => guardar(ded.value) }, 'Guardar cambios'),

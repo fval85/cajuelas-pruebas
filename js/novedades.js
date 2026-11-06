@@ -1,5 +1,12 @@
 // Novedades de cada versión (se muestran en Ajustes > Novedades de la versión).
 export const NOVEDADES = [
+  { v: '2.14.0', t: [
+    'Personas con tarjeta: el administrador puede asignar una persona a más usuarios o quitársela a alguno (dentro de la persona, «Usuarios que la tienen»).',
+    'En la lista de un usuario, «Seleccionar varias» permite copiar o pasar varias personas a otro usuario de una vez; reciben código nuevo y los recibos anteriores se conservan.'
+  ] },
+  { v: '2.13.1', t: [
+    'Personas con tarjeta › Pegar desde Excel: también acepta las filas completas copiadas de la plantilla (Usuario, Sociedad, Nombre, Tarjeta); en ese caso respeta el usuario y la sociedad de cada fila.'
+  ] },
   { v: '2.13.0', t: [
     'Ajustes › Personas con tarjeta (administradores): agregar personas una por una, pegando filas desde Excel o subiendo un archivo Excel/CSV, eligiendo la sociedad y los usuarios.',
     'Vista previa antes de guardar: muestra las nuevas, las que ya existían (no se duplican) y las que traen error (tarjeta incompleta, usuario o sociedad que no existe). El código de cada persona se asigna solo.',
