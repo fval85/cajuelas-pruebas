@@ -8,7 +8,8 @@ import { tarjeta, etiqueta, boton, verDocumento } from './ui.js';
 import { barraCompacta, hojaFiltros, guardadosDe } from './ui_filtros.js';
 import { cargarFuentes, paginasReporte, lienzoGrafico } from './draw.js';
 import { celdaTxt } from './rep_calc.js';
-import { parseExp, FILTROS, filtrar, opcionesFiltro, armarReporte, reporteContrato, estadoCuenta, VISTAS, DIMENSIONES, MEDIDAS, MEDIDAS_INI, GRAFICOS, grafIni, dinero$, dec2, ent0, SEM_TXT, mesTxt, mesCorto, hoyIso } from './exp_calc.js';
+import { xlsx, descargar } from './files.js';
+import { parseExp, FILTROS, filtrar, opcionesFiltro, armarReporte, reportePanel, excelPanel, reporteContrato, estadoCuenta, VISTAS, DIMENSIONES, MEDIDAS, MEDIDAS_INI, GRAFICOS, grafIni, dinero$, dec2, ent0, SEM_TXT, mesTxt, mesCorto, hoyIso } from './exp_calc.js';
 
 const LLAVE = 'cajuelas_exp' + (modoPruebas ? '_t' : '');
 const MIN_REFRESCO = 30;
@@ -32,7 +33,25 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
   const estado = h('p', { class: 'nota estado-datos' });
   const barra = barraCompacta();
   const tabs = h('div', { class: 'seg seg-tabs', role: 'tablist' });
-  const barraFiltros = h('div', { class: 'barra-filtros' }, barra.el);
+  const rapidos = h('div', { class: 'chips chicas envuelve rapidos-exp' });
+  const barraFiltros = h('div', { class: 'barra-filtros' }, barra.el, rapidos);
+  // Botones rápidos: un toque filtra, otro toque quita el filtro.
+  const RAPIDOS = [
+    { t: 'Por cobrar', k: 'cob', v: () => ['Pendiente', 'Pago Parcial'] },
+    { t: 'Por entregar', k: 'ent', v: () => ['Por Entregar', 'Entrega Parcial'] },
+    { t: 'Financiados', k: 'fin', v: () => ['SI'] },
+    { t: 'Este mes', k: 'mes', v: () => [mesTxt(hoyIso().slice(0, 7))] }
+  ];
+  const mismo = (a, b) => a.length === b.length && a.every((x) => b.some((y) => normalizar(x) === normalizar(y)));
+  function pintarRapidos() {
+    clear(rapidos);
+    RAPIDOS.forEach((r) => {
+      const on = mismo(f.fl[r.k] || [], r.v());
+      rapidos.append(h('button', { type: 'button', class: 'chip' + (on ? ' on' : ''), 'aria-pressed': String(on), onclick: () => { if (on) delete f.fl[r.k]; else f.fl[r.k] = r.v(); pintarFiltros(); pintar(); } }, r.t));
+    });
+    const cs = f.fl.comp || [];
+    rapidos.append(h('button', { type: 'button', class: 'chip' + (cs.length ? ' on' : ''), onclick: () => abrirFiltro('comp') }, (cs.length === 1 ? cs[0] : cs.length ? `Compradores: ${cs.length}` : 'Comprador') + ' ▾'));
+  }
 
   // ---------- Filtros ----------
   async function abrirFiltro(k) {
@@ -85,6 +104,7 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
     const activos = act.map((x) => ({ t: textoFiltro(x), abrir: () => abrirFiltro(x.k), quitar: () => { delete f.fl[x.k]; pintarFiltros(); pintar(); } }));
     const gs = guard.lista().map((g) => ({ n: g.n, on: !g.est.mesActual && JSON.stringify(g.est.fl || {}) === JSON.stringify(f.fl), click: () => aplicarGuardado(g.est) }));
     barra.pintar({ nFiltros: act.length, onFiltros: abrirHoja, segmento: segmento(), guardados: gs, activos, onLimpiar: () => { f.fl = {}; pintarFiltros(); pintar(); } });
+    pintarRapidos();
   }
   function pintarTabs() {
     clear(tabs);
@@ -216,11 +236,49 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
     dibujar();
   }
 
+  // ---- Panel: ficha del comprador (o de todo lo filtrado), tarjetas, gráfico y tabla ----
+  let panel = null;
+  function pintarPanel() {
+    const rep = reportePanel(datos, f.fl);
+    panel = rep;
+    if (!rep.ctx.n) return;
+    const fi = rep.ficha;
+    zona.append(h('div', { class: 'tarjeta ficha-exp' + (fi.unComp ? ' comprador' : '') },
+      h('div', { class: 'fuente-cab' }, h('h3', null, fi.titulo), h('span', { class: 'chip-fin' }, fi.fin)),
+      h('div', { class: 'ficha-pares' }, ...fi.pares.flatMap(([a, b]) => [h('small', null, a), h('b', null, b)])),
+      h('div', { class: 'progreso', role: 'img', 'aria-label': `${fi.pct}% de los sacos entregados` }, h('i', { style: `width:${fi.pct}%` }))));
+    zona.append(h('div', { class: 'kpis' }, ...rep.kpis.map((k) => h('div', { class: 'kpi' }, h('small', null, k.t), h('b', null, k.v), k.s ? h('span', { class: 'kpi-sub' }, k.s) : null))));
+    rep.graficos.forEach((g) => {
+      const cv = lienzoGrafico(g, 360, Math.max(170, 56 + g.cats.length * 30)); cv.classList.add('grafico');
+      zona.append(h('div', { class: 'tarjeta grafico-caja' }, cv));
+    });
+    if (rep.recortado) zona.append(h('p', { class: 'nota centrado' }, 'El gráfico muestra los 14 contratos con entrega más próxima; la tabla los tiene todos.'));
+    zona.append(tablaHtml(rep));
+  }
+  const nombreArchivo = () => (panel.ficha.unComp ? panel.ficha.titulo : 'Exportaciones').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  async function compartirPanel() {
+    if (!panel || !panel.ctx.n) return;
+    await cargarFuentes();
+    const pie = `Generado ${ahoraTxt()} · Fuente: Exportaciones${crudo && crudo.actualizado ? ' (' + crudo.actualizado + ')' : ''}`;
+    const nombre = nombreArchivo();
+    verDocumento({ titulo: panel.titulo, paginas: paginasReporte(panel, pie), nombrePdf: `${nombre}_${diaHoy().replace(/-/g, '')}.pdf`, ancho: true, maxPaginas: 4, textoBoton: 'Compartir PDF', intro: panel.subtitulos[0], textoCompartir: panel.titulo });
+  }
+  function excelPanelDescargar() {
+    if (!panel || !panel.ctx.n) return;
+    const nombre = nombreArchivo();
+    const bytes = xlsx('Exportaciones', excelPanel(panel));
+    descargar(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `${nombre}_${diaHoy().replace(/-/g, '')}.xlsx`);
+    toast('Se descargó el Excel.');
+  }
   function pintarContratos() {
     const filas = ordenar(filtrar(datos.contratos, f.fl));
     const br = barraRegistrar(); if (br) zona.append(br);
-    zona.append(h('p', { class: 'nota' }, `${filas.length} ${filas.length === 1 ? 'contrato' : 'contratos'}${Object.keys(f.fl).length ? ' con los filtros elegidos' : ''}. Toque uno para ver su detalle.`));
-    if (!filas.length) zona.append(h('p', { class: 'estado aviso' }, 'No hay contratos con estos filtros.'));
+    if (!filas.length) { zona.append(h('p', { class: 'estado aviso' }, 'No hay contratos con estos filtros.')); return; }
+    pintarPanel();
+    zona.append(h('div', { class: 'botones-panel' },
+      boton('Compartir PDF', 'compartir', 'c-azul', () => compartirPanel()),
+      h('button', { type: 'button', class: 'btn btn-excel', onclick: () => excelPanelDescargar() }, '⬇ Descargar Excel')));
+    zona.append(h('div', { class: 'titulo-grupo' }, `Contratos (${filas.length}) · toque uno para ver su detalle`));
     filas.forEach((c) => zona.append(tarjetaContrato(c)));
   }
 

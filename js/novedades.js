@@ -1,5 +1,10 @@
 // Novedades de cada versión (se muestran en Ajustes > Novedades de la versión).
 export const NOVEDADES = [
+  { v: '2.22.0', t: [
+    'Ventas de exportación › Contratos: botones rápidos a la vista (Por cobrar, Por entregar, Financiados, Este mes y Comprador). Un toque filtra y otro toque quita el filtro.',
+    'Arriba de la lista ahora hay una ficha con lo que se ocupa a mano: si es financiado, contratos, sacos y quintales, precio riel, cuánto se ha entregado, kilos a favor y próxima entrega. Al elegir un comprador, la ficha es de ese comprador.',
+    'Debajo: tarjetas de totales, gráfico de sacos por contrato y tabla (financiado, entrega, sacos, quintales, precio riel, % entregado, monto y por cobrar), con botones Compartir PDF y Descargar Excel.'
+  ] },
   { v: '2.21.0', t: [
     'Ventas de exportación › pagos de contratos financiados: se escribe el pago total del comprador y lo que depositó el banco; la app calcula lo que nos toca y los intereses / cargos del banco. Esos intereses también bajan el «por cobrar», así el contrato cierra en cero. Requiere correr 31_exp_intereses_banco.sql.',
     'Nueva pestaña «Pagos» en Ventas de exportación: todos los pagos con buscador y filtros (financiados, con intereses del banco, sin pago total). Toque uno para corregirlo o anularlo.',

@@ -345,3 +345,69 @@ export function estadoCuenta(d, comp) {
 }
 
 export { fmtMed, dinero$, dec2, ent0 };
+
+// ---------- Panel de la pestaña Contratos: ficha del comprador + tarjetas + gráfico + tabla (también PDF y Excel) ----------
+const ABIERTOS = ['por entregar', 'entrega parcial'];
+export function reportePanel(d, fl) {
+  const filas = filtrar(d.contratos, fl).slice().sort((a, b) => (a.fent || '9999').localeCompare(b.fent || '9999') || a.id.localeCompare(b.id, 'es', { numeric: true }));
+  const S = (k) => filas.reduce((t, r) => t + (r[k] || 0), 0);
+  const comps = [...new Set(filas.map((r) => r.comp).filter(Boolean))];
+  const unComp = (fl.comp || []).length === 1 && comps.length === 1 ? comps[0] : null;
+  const pctE = S('sacC') ? Math.min(100, Math.round(S('sacE') / S('sacC') * 100)) : 0;
+  const fin = filas.filter((r) => r.finan);
+  const nosToca = filas.reduce((t, r) => t + r.monE * r.pct / 100, 0);
+  const cobrado = S('pag') + S('cargos');
+  const abiertos = filas.filter((r) => ABIERTOS.includes(normalizar(r.ent)));
+  const prox = abiertos.filter((r) => r.fent).sort((a, b) => a.fent.localeCompare(b.fent))[0] || null;
+  const fav = filas.some((r) => r.fav != null) ? filas.reduce((t, r) => t + (r.fav || 0), 0) : null;
+  const efe = filas.some((r) => r.efe != null) ? filas.reduce((t, r) => t + (r.efe || 0), 0) : null;
+  const unicos = (k) => [...new Set(filas.map((r) => r[k]).filter(Boolean))];
+  const precios = unicos('precio').sort((a, b) => a - b);
+  const txtPrecios = !precios.length ? '—' : precios.length <= 3 ? precios.map((p) => '$ ' + dec2(p)).join(' · ') : `$ ${dec2(precios[0])} a $ ${dec2(precios[precios.length - 1])}`;
+  const pcts = [...new Set(fin.map((r) => r.pct))];
+  const txtFin = !fin.length ? 'No financiado' : fin.length === filas.length ? `Financiado · nos toca ${pcts.map((p) => ent0(p)).join(' / ')} %` : `${fin.length} de ${filas.length} financiados`;
+  const pares = [
+    ['Contratos', `${filas.length}${abiertos.length ? ` (${abiertos.length} ${abiertos.length === 1 ? 'abierto' : 'abiertos'})` : ''}`],
+    ['Sacos / quintales', `${ent0(S('sacC'))} / ${dec2(S('qqC'))} qq`],
+    ['Precio riel', txtPrecios],
+    ['Entregado', `${ent0(S('sacE'))} sacos (${pctE} %)`],
+    ['Kilos a favor / contra', fav == null ? '—' : `${fav > 0 ? '+' : ''}${dec2(fav)} kg${efe != null ? ' = ' + dinero$(efe) : ''}`],
+    ['Próxima entrega', prox ? `${mesCorto(prox.fent)} · ${ent0(prox.sacP)} sacos (${prox.id})` : abiertos.length ? 'sin fecha' : 'nada pendiente']
+  ];
+  const cert = unicos('cert'), cal = unicos('cal');
+  if (cert.length) pares.push(['Certificación', cert.join(', ')]);
+  if (cal.length) pares.push(['Calidad', cal.join(', ')]);
+  const ficha = { titulo: unComp || (comps.length === 1 ? comps[0] : `${comps.length} compradores`), fin: txtFin, pares, pct: pctE, unComp: !!unComp };
+  const kpis = [
+    { t: 'Sacos por entregar', v: ent0(S('sacP')), s: `${dec2(S('sacP') * (S('sacC') ? S('qqC') / S('sacC') : 1.5))} qq` },
+    { t: 'Quintales del contrato', v: dec2(S('qqC')), s: `${ent0(S('sacC'))} sacos` },
+    { t: 'Monto de contratos', v: dinero$(S('monC')) },
+    { t: fin.length ? 'Entregado · nos toca' : 'Monto entregado', v: dinero$(fin.length ? nosToca : S('monE')), s: fin.length ? `entregado total ${dinero$(S('monE'))}` : '' },
+    { t: fin.length ? 'Pagado + intereses banco' : 'Pagado', v: dinero$(cobrado), s: nosToca > 0.005 ? `${Math.min(100, Math.round(cobrado / nosToca * 100))} % cobrado` : '' },
+    { t: 'Por cobrar', v: dinero$(S('cobrar')) }
+  ];
+  const top = filas.slice(0, 14);
+  const graficos = filas.length ? [{ tipo: 'barrasH', titulo: 'Sacos por contrato: entregados y por entregar', dec: false, cats: top.map((r) => r.id),
+    series: [{ nombre: 'Entregados', valores: top.map((r) => Math.max(0, r.sacE)), color: CH.ent }, { nombre: 'Por entregar', valores: top.map((r) => Math.max(0, r.sacP)), color: CH.por }] }] : [];
+  const conComp = !unComp;
+  const cols = [
+    { t: 'Contrato', tipo: 'txt' }, ...(conComp ? [{ t: 'Comprador', tipo: 'txt' }] : []), { t: 'Financ.', tipo: 'txt', centro: true }, { t: 'Entrega', tipo: 'txt', centro: true },
+    { t: 'Sacos', tipo: 'int', centro: true }, { t: 'Quintales', tipo: 'dec', centro: true }, { t: 'Precio riel', tipo: 'usd', centro: true },
+    { t: 'Entregado %', tipo: 'txt', centro: true }, { t: 'Monto contrato', tipo: 'usd', centro: true }, { t: 'Por cobrar', tipo: 'usd', centro: true }
+  ];
+  const pctTxt = (r) => (r.sacC ? Math.min(100, Math.round(r.sacE / r.sacC * 100)) + ' %' : '—');
+  const filasRep = filas.map((r) => ({ v: [r.id, ...(conComp ? [r.comp] : []), r.finan ? `SI ${ent0(r.pct)} %` : 'NO', r.fent ? mesCorto(r.fent) : '', r.sacC, r.qqC, r.precio || null, pctTxt(r), r.monC, r.cobrar], sem: r.sem, fondo: COLOR_SEM[r.sem] }));
+  if (filas.length > 1) filasRep.push({ v: ['TOTAL', ...(conComp ? [''] : []), '', '', S('sacC'), S('qqC'), null, pctE + ' %', S('monC'), S('cobrar')], negrita: true, fondo: '#E8F1EB' });
+  const tf = textoFiltros(fl);
+  return {
+    vista: 'panel', titulo: unComp ? `Ventas de exportación · ${unComp}` : 'Ventas de exportación', centrado: true,
+    subtitulos: [`${filas.length} ${filas.length === 1 ? 'contrato' : 'contratos'} · ${txtFin}`, ...(tf ? ['Filtros: ' + tf] : [])],
+    ficha, kpis, datos: pares.map(([a, b]) => `${a}: ${b}`), graficos, cols, filas: filasRep, ctx: { n: filas.length }, recortado: filas.length > top.length
+  };
+}
+/** Filas para Excel del panel (números como números). */
+export function excelPanel(rep) {
+  const filas = [[rep.titulo], ...rep.subtitulos.map((t) => [t]), [], ...rep.ficha.pares, [], rep.cols.map((c) => c.t)];
+  rep.filas.forEach((f) => filas.push(f.v.map((v, i) => (v == null ? '' : typeof v === 'number' ? (rep.cols[i].tipo === 'int' ? v : { n: v, dec: true }) : v))));
+  return filas;
+}
