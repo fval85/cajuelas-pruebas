@@ -1,7 +1,7 @@
 import { h, VERSION, toast, clear, dialogo } from './util.js';
 import { cargarCatalogo, cargarBoletosCat, pedirAlmacenamientoPersistente, configurado, limpiarPantallas, modoPruebas } from './store.js';
 import { cargarFuentes } from './draw.js';
-import { cuantosPendientes, enviarPendientes, alCambiarPendientes, iniciarReintentos } from './sync.js';
+import { cuantosPendientes, enviarPendientes, alCambiarPendientes, iniciarReintentos, latido, latidoPronto } from './sync.js';
 import { crearRegistro } from './ui_registro.js';
 import { crearDiario } from './ui_diario.js';
 import { crearBoletos } from './ui_boletos.js';
@@ -11,6 +11,7 @@ import { MODULOS, modulo, permitidos, distribucion } from './nav_barra.js';
 import { saldoPendienteHoy, HORA_SALDO } from './avisos.js';
 import { crearAjustes, actualizarCatalogo } from './ui_ajustes.js';
 import { icono } from './ui.js';
+import { iniciarAtras } from './atras.js';
 import { aplicarApariencia, tabInicio } from './apariencia.js';
 import { hayControl, puede, necesitaLogin, pantallaLogin, cerrarLogin, alCambiarSesion, actualizarUsuarios, sesion } from './users.js';
 
@@ -118,13 +119,15 @@ const tabArranque = () => { const t = tabRecarga || tabInicio(); tabRecarga = nu
 ir(primeraPermitida());
 alCambiarSesion(() => {
   revisarAcceso();
-  if (sesion()) ir(tabArranque());
+  if (sesion()) { ir(tabArranque()); setTimeout(() => latido(true), 2500); }
 });
 revisarAcceso();
 if ((tabInicio() || tabRecarga) && !necesitaLogin()) ir(tabArranque());
 actualizarUsuarios(true).then(() => revisarAcceso());
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') actualizarUsuarios().then(() => revisarAcceso()); });
 setInterval(() => actualizarUsuarios().then(() => revisarAcceso()), 5 * 60000);
+
+iniciarAtras({ pestanaActual: () => actual, pestanaPrincipal: primeraPermitida, irAPestana: (k) => ir(k), hayLogin: necesitaLogin });
 
 // ----- Recordatorio del saldo (a partir de las 7:00 pm) -----
 function revisarSaldo() { barraSaldo.hidden = necesitaLogin() || !saldoPendienteHoy(); }
@@ -147,6 +150,11 @@ barra.addEventListener('click', async () => {
 alCambiarPendientes(pintarBarra);
 pintarBarra();
 iniciarReintentos();
+// Aviso de conexión (versión, última vez y pendientes) para el administrador: al abrir, al volver a la app y cada 10 minutos.
+alCambiarPendientes(latidoPronto);
+setTimeout(() => latido(true), 4000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') latido(); });
+setInterval(() => latido(), 10 * 60000);
 
 // ----- Fuentes y catálogo -----
 cargarFuentes();

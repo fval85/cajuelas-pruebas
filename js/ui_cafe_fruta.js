@@ -1,4 +1,4 @@
-// Reportes › Café en fruta CAPRIS (solo administradores): control informativo de lo entregado a Capris.
+// Reportes › Café en fruta VOLCAFE (solo administradores): control informativo de lo entregado a Capris.
 // Recibo = Fecha, Tipo, Recibo, Finca, Sociedad, Cajuelas; las fanegas se calculan (cajuelas ÷ 20). Sin dinero.
 import { h, clear, toast, confirmar, diaHoy } from './util.js';
 import { cafeFruta } from './sync.js';
@@ -6,10 +6,13 @@ import { puede } from './users.js';
 import { leerArchivoTabla } from './leer_tabla.js';
 import { descargar } from './files.js';
 
+const hoyISO = () => diaHoy();
+
 const CAJ_FANEGA = 20;
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const num = (v, d = 1) => Number(v || 0).toLocaleString('es-CR', { maximumFractionDigits: d }).replace(/[  ]/g, ' ');
 const fan = (caj) => Number(caj || 0) / CAJ_FANEGA;
+const n2 = (v) => Number(v || 0).toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/[  ]/g, ' ');
 const plural = (n, a, b) => `${n} ${n === 1 ? a : b}`;
 const corta = (s) => String(s || '').replace(/\s*S\.?A\.?$/i, '').replace(/^BENEFICIADORA\s+/i, 'BEN. ');
 const dma = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '');
@@ -58,7 +61,7 @@ export function crearCafeFruta({ abrir, volver, alCambiar }) {
   let res = null, error = '', cargando = false;
   let pantalla = 'inicio', param = null;
   const el = h('div', { class: 'cafe-fruta' });
-  const tituloCab = h('h1', null, 'Café en fruta · CAPRIS');
+  const tituloCab = h('h1', null, 'Café en fruta · VOLCAFE');
   const cab = h('header', { class: 'cab-sub' }, h('button', { type: 'button', class: 'atras', 'aria-label': 'Volver', onclick: () => atras() }, '‹'), tituloCab);
   const chip = (t, c) => h('span', { class: 'chip-est ' + c }, t);
   const boton = (t, fn, cls = '') => h('button', { type: 'button', class: `btn-texto ${cls} ancho-total`.replace('  ', ' '), onclick: fn }, t);
@@ -67,6 +70,7 @@ export function crearCafeFruta({ abrir, volver, alCambiar }) {
   function atras() {
     if (pantalla === 'inicio') volver();
     else if (pantalla === 'finca') ir('fincas');
+    else if (pantalla === 'maximo') ir('avance');
     else if (pantalla === 'previa') ir(param.origen);
     else if (pantalla === 'recibo') ir(param.origen || 'recibos', param.origenParam || null);
     else ir('inicio');
@@ -85,54 +89,142 @@ export function crearCafeFruta({ abrir, volver, alCambiar }) {
   // ---------- Tarjeta del inicio de Reportes ----------
   function tarjetaHub(opc = {}) {
     const refBtn = h('button', { type: 'button', class: 'hub-ref' + (cargando ? ' gira' : ''), 'aria-label': 'Actualizar todo', onclick: (e) => { e.stopPropagation(); opc.alRefrescar && opc.alRefrescar(); } }, '↻');
-    const cab3 = h('div', { class: 'fuente-cab' }, h('h3', null, '🍒 Café en fruta · CAPRIS'));
+    const cab3 = h('div', { class: 'fuente-cab' }, h('h3', null, '🍒 Café en fruta · VOLCAFE'));
     if (!res) return h('div', { class: 'fuente vacia hub-fuente' }, refBtn, cab3, h('p', { class: 'sub' }, cargando ? 'Descargando datos…' : error ? '⚠ ' + error : 'Toque ↻ para traer los recibos.'));
     const tipos = res.tipos.filter((t) => t.recibos > 0 || t.maximo);
     const cuerpo = tipos.length ? tipos.map((t) => {
       const fa = fan(t.cajuelas), pct = t.maximo ? Math.min(100, Math.round(fa / t.maximo * 100)) : 0;
-      return h('div', null, h('p', { class: 'sub' }, h('b', null, t.tipo), t.maximo ? ` · ${num(fa)} de ${num(t.maximo, 0)} fanegas` : ` · ${num(fa)} fanegas`),
+      return h('div', null, h('p', { class: 'sub' }, h('b', null, t.tipo), t.maximo ? ` · ${n2(fa)} de ${num(t.maximo, 0)} fanegas` : ` · ${n2(fa)} fanegas`),
         t.maximo ? h('div', { class: 'progreso', role: 'img', 'aria-label': `${pct}% entregado` }, h('i', { style: `width:${pct}%` })) : null,
-        t.maximo ? h('p', { class: 'sub' }, `Faltan ${num(Math.max(0, t.maximo - fa))} fanegas`) : null);
+        t.maximo ? h('p', { class: 'sub' }, `Faltan ${n2(Math.max(0, t.maximo - fa))} fanegas`) : null);
     }) : [h('p', { class: 'sub' }, 'Todavía no hay recibos.')];
-    return h('div', { class: 'fuente toque hub-fuente' + (cargando ? ' carga' : ''), role: 'button', tabindex: '0', onclick: () => { ir('inicio'); abrir(); } }, refBtn, cab3, ...cuerpo,
+    const etq = opc.etiqueta ? opc.etiqueta() : '';
+    return h('div', { class: 'fuente toque hub-fuente' + (cargando ? ' carga' : ''), role: 'button', tabindex: '0', onclick: () => { ir('inicio'); abrir(); } }, refBtn, cab3, etq ? h('p', { class: 'hub-fecha' }, h('i'), etq) : null, ...cuerpo,
       h('p', { class: 'sub' }, plural(res.tipos.reduce((t, x) => t + x.recibos, 0), 'recibo', 'recibos')), h('span', { class: 'hub-flecha', 'aria-hidden': 'true' }, '›'));
   }
 
   // ---------- Pantallas ----------
   function pintar() {
     clear(el);
-    const t = { inicio: 'Café en fruta · CAPRIS', fincas: 'Por finca', finca: param && param.finca || 'Finca', recibos: 'Recibos', nuevo: 'Nuevo recibo', pegar: 'Pegar desde Excel', archivo: 'Subir archivo', previa: 'Vista previa', recibo: param && param.r ? `Recibo ${param.r.recibo}` : 'Recibo', maximo: 'Máximo del contrato', listo: 'Café en fruta' }[pantalla] || 'Café en fruta';
+    const t = { inicio: 'Café en fruta · VOLCAFE', avance: 'Avance por tipo', fincas: 'Por finca', finca: param && param.finca || 'Finca', dias: 'Entregas por día', recibos: 'Recibos', nuevo: 'Nuevo recibo', pegar: 'Pegar desde Excel', archivo: 'Subir archivo', previa: 'Vista previa', recibo: param && param.r ? `Recibo ${param.r.recibo}` : 'Recibo', maximo: 'Máximo del contrato', listo: 'Café en fruta' }[pantalla] || 'Café en fruta';
     tituloCab.textContent = t;
     if (error) { el.append(h('p', { class: 'estado aviso' }, '⚠ ' + error), boton('Reintentar', () => cargar(true))); return; }
     if (!res) { el.append(h('p', { class: 'nota' }, cargando ? 'Cargando…' : 'Sin datos todavía.')); return; }
-    ({ inicio, fincas, finca, recibos, nuevo, pegar, archivo, previa, recibo, maximo, listo })[pantalla]();
+    ({ inicio, avance, fincas, finca, dias, recibos, nuevo, pegar, archivo, previa, recibo, maximo, listo })[pantalla]();
+  }
+
+  // Datos para los gráficos: fanegas y recibos por día (de los recibos ya cargados).
+  function porDia() {
+    const m = new Map();
+    res.recibos.forEach((r) => { const x = m.get(r.fecha) || { dia: r.fecha, caj: 0, n: 0 }; x.caj += Number(r.cajuelas); x.n += 1; m.set(r.fecha, x); });
+    return [...m.values()].sort((a, b) => (a.dia < b.dia ? -1 : 1));
+  }
+  const sumarDias = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`; };
+  /** Últimos n días corridos (con ceros donde no hubo entregas); n = 0 → desde el primer día con recibos. */
+  function serieDias(n) {
+    const datos = porDia(); const mp = new Map(datos.map((x) => [x.dia, x]));
+    const fin = hoyISO(); const ini = n ? sumarDias(fin, -(n - 1)) : (datos[0] ? datos[0].dia : fin);
+    const out = []; for (let d = ini; d <= fin; d = sumarDias(d, 1)) out.push(mp.get(d) || { dia: d, caj: 0, n: 0 });
+    return out;
+  }
+  function columnas(serie, sel, onTap) {
+    const mx = Math.max(1, ...serie.map((x) => x.caj));
+    const caja = h('div', { class: 'cf-cols', role: 'group', 'aria-label': 'Fanegas entregadas por día' });
+    serie.forEach((x) => caja.append(h('button', { type: 'button', class: 'cf-col' + (x.dia === sel ? ' sel' : '') + (x.caj ? '' : ' vacio'), 'aria-label': `${dma(x.dia)}: ${n2(fan(x.caj))} fanegas`, onclick: () => onTap(x.dia) },
+      h('i', { style: `height:${Math.round(x.caj / mx * 100)}%` }))));
+    return caja;
+  }
+  const barraH = (pct) => h('div', { class: 'progreso' }, h('i', { style: `width:${Math.max(0, Math.min(100, pct))}%` }));
+  const totalFan = () => res.tipos.reduce((t, x) => t + fan(x.cajuelas), 0);
+
+  function menuCargar() {
+    const caja = h('div', { class: 'cf-menu' },
+      h('button', { type: 'button', onclick: () => ir('nuevo') }, '＋ Un recibo a mano'),
+      h('button', { type: 'button', onclick: () => ir('pegar') }, '📋 Pegar desde Excel'),
+      h('button', { type: 'button', onclick: () => ir('archivo') }, '📁 Subir archivo Excel / CSV'));
+    return caja;
+  }
+  function exportarCsv() {
+    const f = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const nf = (v, d) => Number(v || 0).toLocaleString('es-CR', { minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: false });
+    const filas = [['FECHA', 'TIPO', 'RECIBO', 'FINCA', 'SOCIEDAD', 'CAJUELAS', 'FANEGAS'].map(f).join(';')];
+    [...res.recibos].sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.id - b.id)).forEach((r) => filas.push([dma(r.fecha), r.tipo, r.recibo, r.finca, r.sociedad, nf(r.cajuelas, 2), nf(fan(r.cajuelas), 2)].map(f).join(';')));
+    descargar(new Blob(['﻿' + filas.join('\r\n')], { type: 'text/csv;charset=utf-8' }), `Cafe_en_Fruta_VOLCAFE_${hoyISO()}.csv`);
+    toast('Se descargó el archivo (ábralo con Excel).');
   }
 
   function inicio() {
+    let abierto = false;
+    const menu = menuCargar(); menu.hidden = true;
+    const bCargar = h('button', { type: 'button', class: 'btn-texto primario cf-cargar', 'aria-expanded': 'false', onclick: () => { abierto = !abierto; menu.hidden = !abierto; bCargar.textContent = abierto ? '＋ Cargar ▴' : '＋ Cargar ▾'; bCargar.setAttribute('aria-expanded', String(abierto)); } }, '＋ Cargar ▾');
+    el.append(h('div', { class: 'cf-fila' }, bCargar, h('button', { type: 'button', class: 'btn-texto cf-excel', onclick: exportarCsv, disabled: !res.recibos.length }, '⬇ Excel')), menu);
     res.tipos.filter((t) => t.recibos > 0 || t.maximo).forEach((t) => {
       const fa = fan(t.cajuelas), pct = t.maximo ? Math.min(100, Math.round(fa / t.maximo * 100)) : 0;
-      el.append(h('div', { class: 'tarjeta' }, h('b', null, t.tipo), h('p', { class: 'sub' }, t.maximo ? `${num(fa)} de ${num(t.maximo, 0)} fanegas` : `${num(fa)} fanegas entregadas`),
-        t.maximo ? h('div', { class: 'progreso' }, h('i', { style: `width:${pct}%` })) : null,
-        h('p', { class: 'nota' }, t.maximo ? (fa > t.maximo ? `Se pasó del máximo por ${num(fa - t.maximo)} fanegas` : `Faltan ${num(t.maximo - fa)} fanegas`) : 'Sin tope definido', ` · ${plural(t.recibos, 'recibo', 'recibos')}`)));
+      el.append(h('div', { class: 'tarjeta', role: 'button', tabindex: '0', onclick: () => ir('avance') }, h('b', null, t.tipo), h('p', { class: 'sub cf-num' }, t.maximo ? `${n2(fa)} de ${num(t.maximo, 0)} fanegas` : `${n2(fa)} fanegas entregadas`),
+        t.maximo ? barraH(pct) : null,
+        h('p', { class: 'nota' }, t.maximo ? (fa > t.maximo ? `Se pasó del máximo por ${n2(fa - t.maximo)} fanegas` : `Faltan ${n2(t.maximo - fa)} fanegas`) : 'Sin tope definido', ` · ${plural(t.recibos, 'recibo', 'recibos')}`)));
     });
-    el.append(boton('＋ Recibo', () => ir('nuevo'), 'primario'), boton('📋 Pegar desde Excel', () => ir('pegar')), boton('📁 Subir archivo Excel / CSV', () => ir('archivo')),
-      boton('Ver por finca', () => ir('fincas')), boton('Ver todos los recibos', () => ir('recibos')), boton('Máximo del contrato', () => ir('maximo')));
+    const serie = serieDias(14);
+    if (res.recibos.length) {
+      el.append(h('div', { class: 'tarjeta' }, h('b', null, 'Entregado por día'), columnas(serie, null, (d) => ir('dias', { sel: d })),
+        h('p', { class: 'nota' }, 'Últimos 14 días. Toque una columna para ver los recibos de ese día.')));
+    }
+    const bald = (ic, t, s, fn) => h('button', { type: 'button', class: 'cf-bald', onclick: fn }, h('span', { 'aria-hidden': 'true' }, ic), h('b', null, t), h('small', null, s));
+    el.append(h('div', { class: 'cf-baldosas' }, bald('📊', 'Avance', 'por tipo', () => ir('avance')), bald('🌾', 'Fincas', 'fanegas', () => ir('fincas')), bald('📅', 'Días', 'entregas', () => ir('dias')), bald('🧾', 'Recibos', `${res.recibos.length}`, () => ir('recibos'))));
+  }
+
+  function avance() {
+    const ult = serieDias(14); const fanUlt = ult.reduce((t, x) => t + fan(x.caj), 0);
+    res.tipos.filter((t) => t.recibos > 0 || t.maximo).forEach((t) => {
+      const fa = fan(t.cajuelas), pct = t.maximo ? Math.min(100, Math.round(fa / t.maximo * 100)) : 0;
+      const filaF = new Map(); res.recibos.filter((r) => r.tipo === t.tipo).forEach((r) => filaF.set(r.finca, (filaF.get(r.finca) || 0) + Number(r.cajuelas)));
+      const top = [...filaF.entries()].sort((a, b) => b[1] - a[1]); const mx = top.length ? top[0][1] : 1;
+      const falta = t.maximo ? Math.max(0, t.maximo - fa) : 0;
+      const ritmo = fanUlt / 14;
+      el.append(h('div', { class: 'tarjeta' }, h('b', null, t.tipo), h('p', { class: 'sub cf-num' }, t.maximo ? `${n2(fa)} de ${num(t.maximo, 0)} fanegas` : `${n2(fa)} fanegas entregadas`),
+        t.maximo ? h('div', { class: 'progreso grande' }, h('i', { style: `width:${pct}%` })) : null,
+        t.maximo ? h('p', { class: 'nota' }, fa > t.maximo ? `Se pasó del máximo por ${n2(fa - t.maximo)} fanegas` : `Faltan ${n2(falta)} fanegas (${100 - pct}%)`) : h('p', { class: 'nota' }, 'Sin tope definido'),
+        t.maximo && falta > 0 && ritmo > 0 ? h('p', { class: 'nota' }, `Al ritmo de los últimos 14 días (${n2(ritmo)} fanegas por día): unos ${Math.ceil(falta / ritmo)} días para completar.`) : null,
+        top.length ? h('div', null, h('b', { class: 'cf-sub' }, 'Por finca'), ...top.slice(0, 6).map(([fi, c]) => h('div', null, h('div', { class: 'cf-hb' }, h('span', null, fi || 'Sin finca'), h('b', { class: 'cf-num' }, n2(fan(c)))), barraH(c / mx * 100)))) : null));
+    });
+    el.append(boton('Cambiar el máximo del contrato', () => ir('maximo')), boton('Volver', () => ir('inicio')));
   }
 
   function fincas() {
     if (!res.fincas.length) { el.append(h('p', { class: 'nota' }, 'Todavía no hay recibos.')); return; }
-    res.fincas.forEach((x) => el.append(h('div', { class: 'fila-aj fila-usuario', role: 'button', tabindex: '0', onclick: () => ir('finca', { finca: x.finca }) },
-      h('span', { class: 'tx' }, x.finca || 'Sin finca', h('small', null, `${corta(x.sociedad)}${x.sociedad ? ' · ' : ''}${plural(x.recibos, 'recibo', 'recibos')}`)), h('b', null, num(fan(x.cajuelas))))));
+    const tot = res.fincas.reduce((t, x) => t + fan(x.cajuelas), 0), mx = Math.max(1, ...res.fincas.map((x) => fan(x.cajuelas)));
+    el.append(h('div', { class: 'tarjeta' }, h('b', { class: 'cf-num' }, `${n2(tot)} fanegas`), h('p', { class: 'nota' }, `${plural(res.fincas.length, 'finca', 'fincas')} · ${plural(res.recibos.length, 'recibo', 'recibos')}`)));
+    res.fincas.forEach((x) => el.append(h('button', { type: 'button', class: 'cf-finca', onclick: () => ir('finca', { finca: x.finca }) },
+      h('span', { class: 'cf-hb' }, h('span', null, x.finca || 'Sin finca'), h('b', null, n2(fan(x.cajuelas)))), barraH(fan(x.cajuelas) / mx * 100),
+      h('small', null, `${corta(x.sociedad)}${x.sociedad ? ' · ' : ''}${plural(x.recibos, 'recibo', 'recibos')}`))));
     el.append(h('p', { class: 'nota' }, 'Fanegas entregadas por finca. Toque una para ver sus recibos.'));
   }
 
   const filaRecibo = (r, origen, origenParam) => h('div', { class: 'fila-aj fila-usuario', role: 'button', tabindex: '0', onclick: () => ir('recibo', { r, origen, origenParam }) },
-    h('span', { class: 'tx' }, `${r.recibo}${r.finca ? ' · ' + r.finca : ''}`, h('small', null, `${dma(r.fecha)} · ${r.tipo} · ${num(r.cajuelas, 2)} cajuelas`)), h('b', null, num(fan(r.cajuelas), 2)));
+    h('span', { class: 'tx' }, `${r.recibo}${r.finca ? ' · ' + r.finca : ''}`, h('small', null, `${dma(r.fecha)} · ${r.tipo} · ${n2(r.cajuelas)} cajuelas`)), h('b', null, n2(fan(r.cajuelas))));
   function finca() {
     const rs = res.recibos.filter((r) => r.finca === param.finca);
     const tot = rs.reduce((t, r) => t + Number(r.cajuelas), 0);
-    el.append(h('div', { class: 'tarjeta' }, h('b', null, `${num(fan(tot), 2)} fanegas`), h('p', { class: 'nota' }, `${plural(rs.length, 'recibo', 'recibos')} · ${num(tot, 2)} cajuelas`)));
+    el.append(h('div', { class: 'tarjeta' }, h('b', { class: 'cf-num' }, `${n2(fan(tot))} fanegas`), h('p', { class: 'nota' }, `${plural(rs.length, 'recibo', 'recibos')} · ${n2(tot)} cajuelas`)));
     rs.forEach((r) => el.append(filaRecibo(r, 'finca', param)));
+  }
+
+  function dias() {
+    let rango = (param && param.rango) || 14; let sel = param && param.sel;
+    const zona = h('div');
+    const dib = () => {
+      clear(zona);
+      const serie = serieDias(rango);
+      if (!sel || !serie.some((x) => x.dia === sel)) { const u = [...serie].reverse().find((x) => x.n); sel = u ? u.dia : serie[serie.length - 1].dia; }
+      const fx = serie.find((x) => x.dia === sel) || { caj: 0, n: 0 };
+      const chips = h('div', { class: 'cf-rango' }, ...[[14, '14 días'], [30, '30 días'], [0, 'Todo']].map(([n, t]) => h('button', { type: 'button', class: 'chip-btn' + (rango === n ? ' on' : ''), onclick: () => { rango = n; dib(); } }, t)));
+      zona.append(chips, h('div', { class: 'tarjeta' }, h('b', null, 'Fanegas por día'), columnas(serie, sel, (d) => { sel = d; dib(); }),
+        h('p', { class: 'sub cf-num' }, `${dma(sel)} · ${n2(fan(fx.caj))} fanegas · ${plural(fx.n, 'recibo', 'recibos')}`)));
+      const rs = res.recibos.filter((r) => r.fecha === sel);
+      if (!rs.length) zona.append(h('p', { class: 'nota' }, 'Ese día no hubo entregas.'));
+      rs.forEach((r) => zona.append(filaRecibo(r, 'dias', { rango, sel })));
+    };
+    el.append(zona); dib();
   }
   function recibos() {
     const q = h('input', { class: 'campo', type: 'search', placeholder: '🔍 Buscar recibo o finca', autocomplete: 'off' });
@@ -172,7 +264,7 @@ export function crearCafeFruta({ abrir, volver, alCambiar }) {
     const act = () => {
       tipoNuevo.hidden = selTipo.value !== NUEVO; fincaNueva.hidden = selFinca.value !== NUEVO;
       const c = Number(String(caj.value).replace(',', '.'));
-      calc.textContent = c > 0 ? `= ${num(fan(c), 2)} fanegas` : 'Las fanegas se calculan solas (cajuelas ÷ 20).';
+      calc.textContent = c > 0 ? `= ${n2(fan(c))} fanegas` : 'Las fanegas se calculan solas (cajuelas ÷ 20).';
     };
     selTipo.addEventListener('change', act); selFinca.addEventListener('change', () => { act(); if (selFinca.value && selFinca.value !== NUEVO) soc.value = defSoc(selFinca.value) || soc.value; }); caj.addEventListener('input', act);
     act();
@@ -228,11 +320,11 @@ export function crearCafeFruta({ abrir, volver, alCambiar }) {
     const nuevas = j.filas.filter((f) => f.estado === 'nueva');
     const caj = nuevas.reduce((t, f) => t + Number(f.cajuelas || 0), 0);
     el.append(h('div', { class: 'tarjeta' }, h('b', null, nombre ? `📁 ${nombre}` : 'Revisión'), h('p', { class: 'nota' }, `${plural(j.nuevas, 'nuevo', 'nuevos')} · ${j.ya} ya ${j.ya === 1 ? 'estaba' : 'estaban'} · ${j.errores} con error`),
-      h('p', { class: 'nota' }, `Los nuevos suman ${num(caj, 2)} cajuelas = ${num(fan(caj), 2)} fanegas.`)));
+      h('p', { class: 'nota' }, `Los nuevos suman ${n2(caj)} cajuelas = ${n2(fan(caj))} fanegas.`)));
     const orden = { error: 0, nueva: 1, ya: 2 };
     [...j.filas].sort((a, b) => orden[a.estado] - orden[b.estado]).slice(0, 300).forEach((f) => {
       const o = filas[f.i - 1] || {};
-      const det = f.estado === 'error' ? f.mensaje : f.estado === 'ya' ? f.mensaje : `${dma(f.fecha)} · ${num(f.cajuelas, 2)} cajuelas · ${num(fan(f.cajuelas), 2)} fanegas` + (f.fincaNueva ? ` · finca nueva (${f.sociedad || 'sin sociedad'})` : '') + (f.tipoNuevo ? ' · tipo nuevo' : '');
+      const det = f.estado === 'error' ? f.mensaje : f.estado === 'ya' ? f.mensaje : `${dma(f.fecha)} · ${n2(f.cajuelas)} cajuelas · ${n2(fan(f.cajuelas))} fanegas` + (f.fincaNueva ? ` · finca nueva (${f.sociedad || 'sin sociedad'})` : '') + (f.tipoNuevo ? ' · tipo nuevo' : '');
       el.append(h('div', { class: 'fila-aj fila-usuario' }, h('span', { class: 'tx' }, `${f.recibo || o.recibo || '(sin recibo)'}${f.finca ? ' · ' + f.finca : ''}`, h('small', null, f.tipo || o.tipo || ''), h('small', null, det)),
         f.estado === 'error' ? chip('Revisar', 'ambar') : f.estado === 'ya' ? chip('Ya está', 'gris') : chip(f.fincaNueva || f.tipoNuevo ? 'Nueva finca/tipo' : 'Nuevo', 'verde')));
     });
@@ -254,7 +346,7 @@ export function crearCafeFruta({ abrir, volver, alCambiar }) {
   // ---------- Un recibo ----------
   function recibo() {
     const r = param.r;
-    el.append(h('div', { class: 'tarjeta' }, h('b', null, `${r.finca || 'Sin finca'}${r.sociedad ? ' · ' + corta(r.sociedad) : ''}`), h('p', { class: 'nota' }, `${dma(r.fecha)} · ${r.tipo} · ${num(r.cajuelas, 2)} cajuelas = ${num(fan(r.cajuelas), 2)} fanegas`)),
+    el.append(h('div', { class: 'tarjeta' }, h('b', null, `${r.finca || 'Sin finca'}${r.sociedad ? ' · ' + corta(r.sociedad) : ''}`), h('p', { class: 'nota' }, `${dma(r.fecha)} · ${r.tipo} · ${n2(r.cajuelas)} cajuelas = ${n2(fan(r.cajuelas))} fanegas`)),
       ...formulario(r, 'Guardar cambios', async (d) => {
         const x = await cafeFruta('editar', { id: r.id, ...d }); toast(x.message, 4000);
         if (x.ok) { await cargar(true); ir(param.origen || 'recibos', param.origenParam || null); }
@@ -275,7 +367,7 @@ export function crearCafeFruta({ abrir, volver, alCambiar }) {
         const x = await cafeFruta('maximo', { tipo: t.tipo, maximo: inp.value }); toast(x.message, 4000); if (x.ok) await cargar(true);
       } }, 'Guardar máximo')));
     });
-    el.append(boton('Volver', () => ir('inicio')));
+    el.append(boton('Volver', () => ir('avance')));
   }
 
   return { cab, el, tarjetaHub, cargar, ocupado: () => cargando, reiniciar() { pantalla = 'inicio'; param = null; pintar(); cargar(false); } };

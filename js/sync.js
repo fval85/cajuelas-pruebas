@@ -1,6 +1,7 @@
 // Sincronización con el Web App de Google Apps Script (misma hoja que usa la app Android).
 import { db, syncCfg, configurado } from './store.js';
 import { SUPA } from './config_supa.js';
+import { VERSION } from './util.js';
 
 let enVuelo = false;
 const oyentes = new Set();
@@ -180,6 +181,7 @@ export async function expAdmin(op, datos, extra = {}) { return postJson('', { ac
 export async function usuariosAdmin(op, datos) { return postJson('', { action: 'usuariosAdmin', op, datos }, 30000); }
 export async function personasAdmin(op, datos) { return postJson('', { action: 'personasAdmin', op, datos }, 60000); }
 export async function cafeFruta(op, datos) { return postJson('', { action: 'cafeFruta', op, datos }, 60000); }
+export async function preciosAdmin(op, datos) { return postJson('', { action: 'preciosAdmin', op, datos }, 30000); }
 
 /** Hojas Resumen, Contratos, Entregas y Pagos del Google Sheet «Exportaciones» (ventas de exportación y consumo nacional). */
 export async function exportaciones() {
@@ -236,30 +238,56 @@ export function iniciarReintentos() {
   intentar();
 }
 
-// ---------- Planillas ----------
-const sesionActual = () => db.get('sesion', null) || {};
-const credenciales = () => { const s = sesionActual(); return { usuario: s.nombre || '', hash: s.hash || '' }; };
-/** Empleados del usuario (sin salarios), tareas por finca y lo registrado entre dos fechas. */
+// ---------- Planillas (servidor Supabase) ----------
+const errPl = (r) => (r.json && r.json.message) || r.message;
+/** Empleados vigentes (sin salarios), tareas por finca, lo registrado y las incapacidades entre dos fechas. */
 export async function planillaDatos(desde, hasta) {
-  if (!configurado()) return { error: 'Falta configurar la URL y el token en Ajustes > Administración.' };
-  const { url, token } = syncCfg();
-  const r = await postJson(url, { action: 'planillaDatos', token, desde, hasta, ...credenciales() }, 45000);
-  if (!r.ok) return { error: /desconocid/i.test(r.message) ? 'El Apps Script no está actualizado (falta la acción planillaDatos).' : r.message };
-  return { error: null, ...r.json };
+  const r = await postJson('', { action: 'planillaDatos', desde, hasta }, 45000);
+  return r.ok ? { error: null, ...r.json } : { error: errPl(r) };
 }
 export async function planillaAnular({ dia, sociedad, finca, motivo }) {
-  if (!configurado()) return { error: 'Falta configurar la URL y el token en Ajustes > Administración.' };
-  const { url, token } = syncCfg();
-  const r = await postJson(url, { action: 'planillaAnular', token, dia, sociedad, finca, motivo, ...credenciales() }, 45000);
-  return r.ok ? { error: null } : { error: (r.json && r.json.message) || r.message };
+  const r = await postJson('', { action: 'planillaAnular', dia, sociedad, finca, motivo }, 45000);
+  return r.ok ? { error: null } : { error: errPl(r) };
 }
 export async function planillaMontos(desde, hasta) {
-  if (!configurado()) return { error: 'Falta configurar la URL y el token en Ajustes > Administración.' };
-  const { url, token } = syncCfg();
-  const r = await postJson(url, { action: 'planillaMontos', token, desde, hasta, ...credenciales() }, 60000);
-  return r.ok ? { error: null, filas: r.json.filas || [] } : { error: (r.json && r.json.message) || r.message };
+  const r = await postJson('', { action: 'planillaMontos', desde, hasta }, 60000);
+  return r.ok ? { error: null, filas: r.json.filas || [] } : { error: errPl(r) };
 }
+/** Mantenimiento de empleados (solo administradores): op = lista | ficha | guardarEmpleado | cambio | traslado | quitarVigencia | nuevaFinca. */
+export async function planillasAdmin(op, datos) { return postJson('', { action: 'planillasAdmin', op, datos }, 45000); }
 /** Arma el envío de un día de planilla para la cola de pendientes. */
 export function payloadPlanilla({ reportId, dia, sociedad, finca, empleados }) {
-  return { formato: 'planilla', reportId, dia, sociedad, finca, empleados, ...credenciales() };
+  return { formato: 'planilla', reportId, dia, sociedad, finca, empleados };
+}
+
+// ---------- Conexión del usuario (para que el administrador vea última conexión, versión y pendientes) ----------
+const tipoPend = (p) => (p.formato === 'recibo' ? 'Diario' : p.formato === 'boleto' ? 'Boletos' : p.formato === 'planilla' ? 'Planillas' : p.formato ? 'Otros' : 'Registro');
+/** Pendientes por tipo: { Registro: {n, viejo}, Boletos: {...} } (viejo = fecha del más antiguo). */
+export function resumenPendientes() {
+  const r = {};
+  pendientes().forEach((p) => {
+    const t = tipoPend(p || {}), x = r[t] || (r[t] = { n: 0, viejo: '' });
+    x.n++; if (!x.viejo) x.viejo = String(p.fechaHora || p.dia || '').slice(0, 30);
+  });
+  return r;
+}
+let ultLatido = 0, ultFirma = '', temporizador = null;
+/** Avisa al servidor, en segundo plano. Nunca molesta: sin sesión, sin red o con cualquier error simplemente no hace nada. */
+export async function latido(forzar = false) {
+  try {
+    if (!SUPA || !navigator.onLine) return;
+    const ses = db.get('sesion', null);
+    if (!ses || !ses.token) return;
+    const pend = resumenPendientes(), firma = JSON.stringify(pend);
+    if (!forzar && firma === ultFirma && Date.now() - ultLatido < 5 * 60000) return;
+    ultLatido = Date.now(); ultFirma = firma;
+    await rpcSupa('api', { p_token: ses.token, p: { action: 'latido', version: VERSION, dispositivo: db.get('device_name', '') || '', pendientes: pend } }, 15000);
+  } catch { /* nada: es solo informativo */ }
+}
+/** Cuando cambian los pendientes, espera 15 segundos (por si salen varios seguidos) y avisa una sola vez. */
+export function latidoPronto() { clearTimeout(temporizador); temporizador = setTimeout(() => latido(), 15000); }
+/** Solo administradores. */
+export async function conexionesAdmin() {
+  const r = await postJson('', { action: 'conexiones' }, 30000);
+  return r.ok ? { filas: r.json.filas || [], ahora: r.json.ahora } : { filas: null, error: r.message };
 }

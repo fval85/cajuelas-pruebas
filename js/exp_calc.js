@@ -34,7 +34,7 @@ export function parseExp(resp) {
       fav: numN(o['kilos a favor / contra']), sug: numN(o['sacos sugeridos para cerrar']), precio: num(o['precio rieles']),
       qqC, qqE: sacC ? qqC * sacE / sacC : 0,
       monC: num(o['monto del contrato $']), monE: num(o['monto entregado $']), monP: num(o['monto por entregar $']),
-      efe: numN(o['efecto kilos a favor / contra $']), pag: num(o['monto pagado $']), cobrar: num(o['monto por cobrar $']), con: 1,
+      efe: numN(o['efecto kilos a favor / contra $']), pag: num(o['monto pagado $']), cargos: num(o['cargos banco $']), cobrar: num(o['monto por cobrar $']), con: 1,
       // Financiado: el banco recibe todo y nos devuelve solo nuestro % (30 por defecto). «Por cobrar» ya viene calculado sobre ese %.
       finan: o['financiado'] === true, pct: o['financiado'] === true ? (numN(o['pct nuestro']) ?? 30) : 100, pctC: numN(c['pct nuestro']),
       monN: num(o['monto entregado nuestro $']), monB: num(o['monto entregado banco $'])
@@ -47,7 +47,7 @@ export function parseExp(resp) {
     tot: numN(o['total $']), real: numN(o['monto real $']), guia: txt(o['estado de guia']), est: txt(o['confirmacion de salida']),
     dbId: o['id'] ?? null, boletaN: txt(o['boleta nuestra']), guiaC: txt(o['guia comprador']), obs: txt(o['observaciones'])
   }));
-  const pagos = objetos(resp.pagos).map((o) => ({ dbId: o['id'] ?? null, id: txt(o['no. contrato']), fecha: txt(o['fecha pago']), monto: num(o['monto pagado $']), nota: txt(o['referencia / nota']) }));
+  const pagos = objetos(resp.pagos).map((o) => ({ dbId: o['id'] ?? null, id: txt(o['no. contrato']), fecha: txt(o['fecha pago']), monto: num(o['monto pagado $']), nota: txt(o['referencia / nota']), cargo: num(o['cargo banco $']), total: numN(o['pago total $']) }));
   const d = { contratos, entregas, pagos, listas: resp.listas || {}, diasGuia: Number.isFinite(Number(resp.diasAlertaGuia)) ? Number(resp.diasAlertaGuia) : 3 };
   d.alertas = alertasDe(d);
   contratos.forEach((c) => { c.sem = semaforo(c, d.alertas.por.get(c.id) || []); c.semTxt = SEM_TXT[c.sem]; });
@@ -137,7 +137,7 @@ export const MEDIDAS = [
   { k: 'fav', t: 'Kilos A Favor / Contra', tipo: 'dec', neg: true },
   { k: 'monC', t: 'Monto Del Contrato $', tipo: 'usd' }, { k: 'monE', t: 'Monto Entregado $', tipo: 'usd' }, { k: 'monP', t: 'Monto Por Entregar $', tipo: 'usd' },
   { k: 'monN', t: 'Monto Entregado Que Nos Toca $', tipo: 'usd' }, { k: 'monB', t: 'Monto Entregado Del Banco $', tipo: 'usd' },
-  { k: 'pag', t: 'Monto Pagado $', tipo: 'usd' }, { k: 'cobrar', t: 'Monto Por Cobrar $', tipo: 'usd', neg: true }, { k: 'efe', t: 'Efecto Kilos A Favor / Contra $', tipo: 'usd', neg: true }
+  { k: 'pag', t: 'Monto Pagado $', tipo: 'usd' }, { k: 'cargos', t: 'Intereses / Cargos Banco $', tipo: 'usd' }, { k: 'cobrar', t: 'Monto Por Cobrar $', tipo: 'usd', neg: true }, { k: 'efe', t: 'Efecto Kilos A Favor / Contra $', tipo: 'usd', neg: true }
 ];
 export const MEDIDAS_INI = ['sacC', 'sacE', 'sacP', 'monE', 'pag', 'cobrar'];
 const MED = Object.fromEntries(MEDIDAS.map((m) => [m.k, m]));
@@ -312,7 +312,8 @@ export function reporteContrato(d, c) {
   if (c.fav != null) datos.push(`Kilos a favor / contra: ${dec2(c.fav)} kg${c.efe != null ? ' (efecto ' + dinero$(c.efe) + ')' : ''}.`);
   if (c.finan) datos.push(`Financiado: nos toca el ${dec2(c.pct)} % (${dinero$(c.monC * c.pct / 100)} del contrato); el resto (${dinero$(c.monC * (100 - c.pct) / 100)}) es del banco. De lo entregado nos tocan ${dinero$(c.monN)}.`);
   if (c.sug != null || c.prom != null) datos.push(`Para cerrar el contrato: ${c.sug == null ? '—' : ent0(c.sug) + ' sacos sugeridos'}${c.prom != null ? ' · promedio ' + dec2(c.prom) + ' kg por saco' : ''}.`);
-  if (pagos.length) datos.push('Pagos: ' + pagos.map((p) => `${p.fecha ? p.fecha.slice(8, 10) + '/' + p.fecha.slice(5, 7) + '/' + p.fecha.slice(0, 4) : 's/f'} ${dinero$(p.monto)}${p.nota ? ' (' + p.nota + ')' : ''}`).join(' · ') + '.');
+  if (pagos.length) datos.push('Pagos: ' + pagos.map((p) => `${p.fecha ? p.fecha.slice(8, 10) + '/' + p.fecha.slice(5, 7) + '/' + p.fecha.slice(0, 4) : 's/f'} ${dinero$(p.monto)}${p.cargo > 0 ? ' + intereses banco ' + dinero$(p.cargo) : ''}${p.nota ? ' (' + p.nota + ')' : ''}`).join(' · ') + '.');
+  if (c.cargos > 0) datos.push(`Intereses / cargos cobrados por el banco: ${dinero$(c.cargos)} (ya descontados del por cobrar).`);
   else datos.push('Pagos: todavía no hay pagos registrados.');
   ((d.alertas.por.get(c.id)) || []).forEach((a) => datos.push('⚠ ' + a.t + '.'));
   rep.datos = datos; rep.unaHoja = true; rep.graficos = [];
@@ -333,8 +334,8 @@ export function estadoCuenta(d, comp) {
   ];
   const fr = filas.map((c) => ({ v: [c.id, c.semTxt, c.sacE, c.sacP, c.monE, c.pag, c.cobrar], fondo: COLOR_SEM[c.sem] }));
   if (filas.length > 1) fr.push({ negrita: true, fondo: '#E8F1EB', v: ['TOTAL', '', S('sacE'), S('sacP'), S('monE'), S('pag'), S('cobrar')] });
-  const datos = [`Saldo por cobrar: ${dinero$(S('cobrar'))} (entregado ${dinero$(S('monE'))} menos pagado ${dinero$(S('pag'))}).`];
-  if (pagos.length) datos.push('Pagos recibidos: ' + pagos.map((p) => `${p.fecha ? p.fecha.slice(8, 10) + '/' + p.fecha.slice(5, 7) + '/' + p.fecha.slice(0, 4) : 's/f'} ${p.id} ${dinero$(p.monto)}`).join(' · ') + '.');
+  const datos = [`Saldo por cobrar: ${dinero$(S('cobrar'))} (entregado ${dinero$(S('monE'))} menos pagado ${dinero$(S('pag'))}${S('cargos') > 0 ? ' e intereses del banco ' + dinero$(S('cargos')) : ''}).`];
+  if (pagos.length) datos.push('Pagos recibidos: ' + pagos.map((p) => `${p.fecha ? p.fecha.slice(8, 10) + '/' + p.fecha.slice(5, 7) + '/' + p.fecha.slice(0, 4) : 's/f'} ${p.id} ${dinero$(p.monto)}${p.cargo > 0 ? ' + intereses ' + dinero$(p.cargo) : ''}`).join(' · ') + '.');
   else datos.push('Todavía no hay pagos registrados.');
   return {
     vista: 'estado', titulo: `Estado de cuenta · ${comp}`, subtitulos: [`Fecha: ${hoyIso().slice(8, 10)}/${hoyIso().slice(5, 7)}/${hoyIso().slice(0, 4)} · ${filas.length} ${filas.length === 1 ? 'contrato' : 'contratos'}`],

@@ -1,7 +1,40 @@
 // Novedades de cada versión (se muestran en Ajustes > Novedades de la versión).
 export const NOVEDADES = [
+  { v: '2.21.0', t: [
+    'Ventas de exportación › pagos de contratos financiados: se escribe el pago total del comprador y lo que depositó el banco; la app calcula lo que nos toca y los intereses / cargos del banco. Esos intereses también bajan el «por cobrar», así el contrato cierra en cero. Requiere correr 31_exp_intereses_banco.sql.',
+    'Nueva pestaña «Pagos» en Ventas de exportación: todos los pagos con buscador y filtros (financiados, con intereses del banco, sin pago total). Toque uno para corregirlo o anularlo.',
+    'El detalle del contrato, el PDF y el estado de cuenta muestran los intereses del banco; en Tablas hay una medida nueva «Intereses / Cargos Banco $». Los contratos no financiados siguen igual.'
+  ] },
+  { v: '2.20.1', t: ['Diario: los cuartillos solo aceptan 0, 25, 50 o 75 (también 0,25 · 0,50 · 0,75, que se convierten solos). Si se escribe otro número, el cuadro se pone en rojo, aparece un aviso y «Emitir recibo» queda desactivado hasta corregirlo.'] },
+  { v: '2.20.0', t: ['Ajustes › Respaldo de datos (administradores): con un toque descarga todo en un ZIP (un archivo Excel .csv por tabla), desde el teléfono o la computadora, sin entrar a Supabase. Muestra hace cuántos días fue el último respaldo. Requiere correr 30_respaldo.sql.'] },
+  { v: '2.19.0', t: [
+    'Ajustes › Usuarios (administradores): ahora se ve la última conexión de cada usuario, el teléfono, la versión de la app y los envíos pendientes por tipo (Registro, Diario, Boletos, Planillas). Marca 🔴 sin conexión desde hace 3 días o más, 🟠 versión anterior y ⚠ pendientes, con el filtro «Solo con problemas».',
+    'Requiere correr 29_conexiones.sql. Cada teléfono empieza a reportar cuando se actualiza a esta versión.'
+  ] },
+  { v: '2.18.2', t: ['Ajustes › Usuarios: un Administrador ya no se puede «personalizar» (al hacerlo perdía el acceso total y dejaba de ver Café en fruta VOLCAFE). Si a un administrador se le quitó, abra su usuario y guarde: queda con «Lo del rol».'] },
+  { v: '2.18.1', t: ['Ajustes › Usuarios: corregido el mensaje «Permiso no válido: emitir» al guardar un usuario (por ejemplo al quitarle Planillas).'] },
+  { v: '2.18.0', t: [
+    'Planillas ahora usa el servidor nuevo (Supabase). Requiere correr 27_planillas.sql y 28_planillas_datos.sql.',
+    'Estado del día por empleado: Trabajó, Incapacidad, Vacaciones, Permiso o Ausente. La incapacidad pide tipo CCSS o INS, N.º de boleta y «Hasta» (varios días); en la planilla sale INC en rojo con 0 horas. Las vacaciones se cuentan y pagan.',
+    'Nota por empleado: sale al pie de la planilla impresa y el nombre lleva un asterisco (*).',
+    'Ajustes › Administración › Empleados de planillas (solo administradores): buscar y filtrar por sociedad, ver y editar todo (incluido salario), cambios con «vale desde» (siempre un viernes), trasladar de sociedad (el N.º no cambia), historial editable, Inactivo en lugar de borrar y crear fincas nuevas.',
+    'Montos de la semana: columnas de vacaciones e incapacidades (CCSS e INS).'
+  ] },
+  { v: '2.17.0', t: [
+    'Botón «atrás» del celular: ya no saca de la app. Retrocede un paso (cierra la ventana abierta, o vuelve a la pantalla anterior como la flecha «‹»; desde otra pestaña vuelve a Registro). Solo sale de la app desde la pantalla principal de Registro.'
+  ] },
+  { v: '2.16.1', t: [
+    'Intereses de Históricos: los días se calculan como en la hoja GENERAL de Excel. En meses de 30 días y febrero no se resta el día de más (un recibo del 4 de noviembre cuenta 26 días); en meses de 31 días el 30 da 0 y el 31 da 1 día. Requiere correr el SQL 26_intereses_dias.sql.',
+    'Reportes: la tarjeta de Café recibido usa el ícono 🍒 y la de Café en fruta VOLCAFE muestra la misma etiqueta «Cosecha … · hasta …».'
+  ] },
+  { v: '2.16.0', t: [
+    'Reportes › Café en fruta VOLCAFE: «＋ Cargar» (a mano, pegar o subir archivo) y «⬇ Excel» arriba, el avance contra el máximo, un gráfico de entregas por día (toque una columna para ver sus recibos) y reportes de Avance por tipo, Fincas, Días y Recibos. Todas las fanegas con 2 decimales.',
+    'Diario (administradores): «Anular» ahora permite anular un recibo de cualquier día o de otro usuario. Al anularlo ofrece actualizar Históricos de esa fecha (se restan los recibos anulados, con vista previa).',
+    'Ajustes › Administración › Precios del registro: el administrador cambia el precio de la cajuela (hoy ₡1 800) sin tocar el servidor. Elige si vale ahora o mañana a las 6:00 a. m. y si reemplaza al anterior o salen los dos. Los recibos ya hechos no cambian. Hay historial.',
+    'Ajustes más limpio: se quitaron Modo de pruebas, Sincronización con la hoja, la clave de esa pantalla, Copia de seguridad y Empezar de cero, que ya no hacen falta con el servidor nuevo. «Descartar envíos pendientes» quedó junto a Envíos.'
+  ] },
   { v: '2.15.0', t: [
-    'Reportes › Café en fruta · CAPRIS (administradores): control simple de lo entregado a Capris. Muestra las fanegas entregadas por tipo contra el máximo del contrato («Faltan …») y las fanegas de cada finca.',
+    'Reportes › Café en fruta · VOLCAFE (administradores): control simple de lo entregado. Muestra las fanegas entregadas por tipo contra el máximo del contrato («Faltan …») y las fanegas de cada finca.',
     'Cada recibo lleva Fecha, Tipo, Recibo, Finca, Sociedad y Cajuelas; las fanegas se calculan solas (cajuelas ÷ 20). Se agregan a mano, pegando desde Excel o subiendo la plantilla, siempre con vista previa. Un mismo recibo puede repartirse entre fincas.',
     'El máximo de fanegas de cada tipo se puede cambiar si Capris amplía el contrato. Los recibos se pueden editar o anular.'
   ] },

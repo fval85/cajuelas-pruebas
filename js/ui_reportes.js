@@ -2,7 +2,8 @@
 import { h, clear, toast, elegir, normalizar, diaHoy, ahoraTxt, confirmar, dialogo } from './util.js';
 import { puede } from './users.js';
 import { modoPruebas } from './store.js';
-import { historicos, pasarAHistoricos } from './sync.js';
+import { historicos } from './sync.js';
+import { pasarDiaFlujo } from './ui_pasar_hist.js';
 import { elegirVarios } from './util.js';
 import { barraCompacta, hojaFiltros, guardadosDe, elegirPeriodo } from './ui_filtros.js';
 import { tarjeta, etiqueta, banda, selector, boton, verDocumento, cabSub } from './ui.js';
@@ -295,26 +296,7 @@ export function crearReportes(nav) {
   async function pasarDia(fecha) {
     btnPasar.disabled = true;
     try {
-      toast('Revisando recibos de Diario…');
-      const v = await pasarAHistoricos({ fecha, soloVer: true });
-      if (v.error) { toast(v.error, 7000); return; }
-      const miles = (n) => Number(n).toLocaleString('es-CR', { maximumFractionDigits: 2 });
-      let texto = `${v.lineas} línea(s) · ${miles(v.cajuelas)} cajuelas (${miles(v.cajuelas / 20)} fanegas) del ${fmtFechaDMA(fecha)}.\nUna línea por sociedad y finca, sin los recibos anulados. El tipo queda en M.`;
-      if (v.reemplaza) texto += `\n\nYa se habían pasado ${v.reemplaza} línea(s) de este día: se reemplazan (se conservan el tipo y el N° de recibo que haya escrito).`;
-      if (v.sinSociedad && v.sinSociedad.length) texto += `\n\n⚠ Sociedades que no están en la hoja «Sociedades» de Históricos:\n• ${v.sinSociedad.join('\n• ')}`;
-      if (v.sinFinca && v.sinFinca.length) texto += `\n\n⚠ Fincas sin número en la hoja «Fincas»:\n• ${v.sinFinca.join('\n• ')}`;
-      if (!await confirmar('Pasar a Históricos', texto, { si: 'Pasar al Históricos' })) return;
-      let forzar = false;
-      if (v.manuales) {
-        if (!await confirmar('Ese día ya tiene líneas', `En Históricos ya hay ${v.manuales} línea(s) del ${fmtFechaDMA(fecha)} escritas a mano. Si continúa se agregan las de Diario además de esas (podrían quedar repetidas).`, { si: 'Agregar de todos modos', peligro: true })) return;
-        forzar = true;
-      }
-      toast('Pasando a Históricos…');
-      const r = await pasarAHistoricos({ fecha, forzar });
-      if (r.error) { toast(r.error, 8000); return; }
-      toast(r.message, 6000);
-      try { localStorage.removeItem(LLAVE_CACHE); } catch { /* nada */ }
-      cargar(true);
+      if (await pasarDiaFlujo(fecha)) { try { localStorage.removeItem(LLAVE_CACHE); } catch { /* nada */ } cargar(true); }
     } finally { btnPasar.disabled = false; }
   }
   const btnPasar = { disabled: false };
@@ -389,7 +371,7 @@ export function crearReportes(nav) {
   const prog = { on: false, fin: false, pct: 0, t: 0 };
   const barraProg = h('div', { class: 'barra-prog', role: 'progressbar', 'aria-label': 'Descargando datos' }, h('div', { class: 'bp-pista' }, h('i')), h('b', null, '0%'));
   const ocupado = () => cargando || exp.ocupado() || cafeF.ocupado();
-  const opcHub = { alRefrescar: actualizarTodo, ocultar: () => ocultar, gira: ocupado };
+  const opcHub = { alRefrescar: actualizarTodo, ocultar: () => ocultar, gira: ocupado, etiqueta: () => (datos && f.cos ? `Cosecha ${f.cos} · hasta ${fmtFechaDMA(f.corte || ref())}` : '') };
   function dibujarBarra() { barraProg.querySelector('i').style.width = prog.pct.toFixed(0) + '%'; barraProg.querySelector('b').textContent = prog.pct.toFixed(0) + '%'; barraProg.setAttribute('aria-valuenow', prog.pct.toFixed(0)); }
   function syncProg() {
     tarjAcciones.classList.toggle('desc', ocupado());
@@ -423,7 +405,7 @@ export function crearReportes(nav) {
     const subeBaja = pill ? h('p', { class: 'vs ' + (pillNeg ? 'baja' : 'sube') }, (pillNeg ? '▼ ' : '▲ ') + pill) : null;
     const cafe = h('div', { class: 'fuente toque hub-fuente' + (ocupado() ? ' carga' : ''), role: 'button', tabindex: '0', onclick: () => ir('detalle') },
       h('button', { type: 'button', class: 'hub-ref' + (ocupado() ? ' gira' : ''), 'aria-label': 'Actualizar todo', onclick: (e) => { e.stopPropagation(); actualizarTodo(); } }, '↻'),
-      h('div', { class: 'fuente-cab' }, h('h3', null, '☕ Café recibido')),
+      h('div', { class: 'fuente-cab' }, h('h3', null, '🍒 Café recibido')),
       h('p', { class: 'hub-fecha' }, h('i'), `Cosecha ${f.cos} · hasta ${fmtFechaDMA(corte)}`),
       h('p', { class: 'hub-act' }, '↻ ' + (hace() || 'Sin actualizar') + (errorCarga ? ' · ⚠ sin conexión' : '')),
       h('div', { class: 'hub-dos' },

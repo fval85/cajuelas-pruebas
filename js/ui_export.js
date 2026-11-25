@@ -12,7 +12,7 @@ import { parseExp, FILTROS, filtrar, opcionesFiltro, armarReporte, reporteContra
 
 const LLAVE = 'cajuelas_exp' + (modoPruebas ? '_t' : '');
 const MIN_REFRESCO = 30;
-const leerCache = () => { try { const o = JSON.parse(localStorage.getItem(LLAVE) || 'null'); return o && o.v === 3 ? o : null; } catch { return null; } };
+const leerCache = () => { try { const o = JSON.parse(localStorage.getItem(LLAVE) || 'null'); return o && o.v === 4 ? o : null; } catch { return null; } };
 const guardarCache = (o) => { try { localStorage.setItem(LLAVE, JSON.stringify(o)); } catch { /* sin espacio: se pedirá de nuevo */ } };
 const fechaCorta = (x) => (x ? `${x.slice(8, 10)}/${x.slice(5, 7)}/${x.slice(0, 4)}` : 's/f');
 const ORDEN_SEM = { rojo: 0, ambar: 1, gris: 2, verde: 3 };
@@ -21,6 +21,7 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
   let crudo = null, datos = null, error = '', cargando = false;
   let f = { fl: {}, dims: ['comp'], med: [...MEDIDAS_INI], graf: grafIni() };
   let vista = 'contratos', tab = 'contratos', sub = 'entregar', detalleId = null, ultimo = null;
+  let qPag = '', fPag = 'todos';
   const guard = guardadosDe('exp');
 
   // ---- Cabecera: «‹ Ventas de exportación» o «‹ Contrato X» ----
@@ -87,7 +88,7 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
   }
   function pintarTabs() {
     clear(tabs);
-    [['contratos', 'Contratos'], ['seguimiento', 'Seguimiento'], ['tablas', 'Tablas']].forEach(([k, t]) => tabs.append(h('button', { type: 'button', role: 'tab', 'aria-selected': String(tab === k), class: tab === k ? 'on' : '', onclick: () => { tab = k; detalleId = null; redibujar(); } },
+    [['contratos', 'Contratos'], ['seguimiento', 'Seguimiento'], ['tablas', 'Tablas'], ['pagos', 'Pagos']].forEach(([k, t]) => tabs.append(h('button', { type: 'button', role: 'tab', 'aria-selected': String(tab === k), class: tab === k ? 'on' : '', onclick: () => { tab = k; detalleId = null; redibujar(); } },
       t, k === 'seguimiento' && datos && datos.alertas.lista.length ? h('span', { class: 'punto-alerta' }, String(datos.alertas.lista.length)) : null)));
     tabs.hidden = !datos || !!detalleId;
   }
@@ -174,6 +175,47 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
       h('button', { type: 'button', onclick: () => tras(nuevaSalida(datos, idContrato)) }, '🚚 Salida'),
       h('button', { type: 'button', onclick: () => tras(nuevoPago(datos, idContrato)) }, '💵 Pago'));
   }
+  // ---- Pagos: todos los pagos, para buscar, revisar y corregir ----
+  function pintarPagos() {
+    const ids = new Set(filtrar(datos.contratos, f.fl).map((c) => c.id));
+    const con = (id) => datos.contratos.find((c) => c.id === id) || null;
+    if (puedeEditarExp()) zona.append(h('div', { class: 'acciones-exp' }, h('button', { type: 'button', style: 'grid-column:1 / -1', onclick: () => tras(nuevoPago(datos)) }, '💵 Registrar pago')));
+    const q = h('input', { class: 'campo', type: 'search', placeholder: '🔍 Buscar contrato, comprador o referencia', value: qPag, autocomplete: 'off' });
+    const chips = h('div', { class: 'chips chicas envuelve' }, ...[['todos', 'Todos'], ['fin', 'Financiados'], ['int', 'Con intereses banco'], ['falta', '⚠ Sin pago total']].map(([k, tx]) =>
+      h('button', { type: 'button', class: 'chip' + (fPag === k ? ' on' : ''), onclick: () => { fPag = k; redibujar(); } }, tx)));
+    const lista = h('div');
+    zona.append(q, chips, lista);
+    const dibujar = () => {
+      clear(lista);
+      const toks = normalizar(qPag).split(' ').filter(Boolean);
+      const ps = datos.pagos.filter((p) => {
+        const c = con(p.id);
+        if (c && !ids.has(p.id)) return false;
+        if (fPag === 'fin' && !(c && c.finan)) return false;
+        if (fPag === 'int' && !(p.cargo > 0)) return false;
+        if (fPag === 'falta' && !(c && c.finan && p.total == null)) return false;
+        const tx = normalizar(`${p.id} ${c ? c.comp : ''} ${p.nota} ${fechaCorta(p.fecha)}`);
+        return toks.every((k) => tx.includes(k));
+      }).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || (b.dbId || 0) - (a.dbId || 0));
+      const nFalta = datos.pagos.filter((p) => { const c = con(p.id); return c && c.finan && p.total == null; }).length;
+      if (nFalta && fPag !== 'falta') lista.append(h('div', { class: 'alerta' }, h('span', { 'aria-hidden': 'true' }, '⚠'), h('span', null, h('b', null, `${nFalta} ${nFalta === 1 ? 'pago financiado' : 'pagos financiados'} sin el pago total`), 'Se registraron antes de esta versión: ábralos con ✎ y complete el pago total del comprador para que se calculen los intereses del banco.')));
+      lista.append(h('p', { class: 'nota' }, `${ps.length} ${ps.length === 1 ? 'pago' : 'pagos'} · depositado ${dinero$(ps.reduce((s, p) => s + p.monto, 0))} · intereses banco ${dinero$(ps.reduce((s, p) => s + (p.cargo || 0), 0))}`));
+      if (!ps.length) lista.append(h('p', { class: 'estado aviso' }, 'No hay pagos con esa búsqueda o filtro.'));
+      ps.slice(0, 300).forEach((p) => {
+        const c = con(p.id), fin = !!(c && c.finan), editable = puedeEditarExp() && p.dbId != null;
+        const det = fin ? (p.total == null ? '⚠ falta el pago total (registrado antes del cambio)' : `Total ${dinero$(p.total)} · nos toca ${dinero$(Math.round(p.total * c.pct) / 100)} · intereses banco ${dinero$(p.cargo || 0)}`) : '';
+        lista.append(h('div', { class: 'tarj-contrato', role: editable ? 'button' : null, tabindex: editable ? '0' : null, onclick: editable ? () => tras(nuevoPago(datos, p.id, p)) : null },
+          h('h3', null, h('span', null, `${fechaCorta(p.fecha)} · ${p.id}`), h('span', { class: 'der' }, dinero$(p.monto) + (editable ? '  ✎' : ''))),
+          h('p', { class: 'sub' }, `${c ? c.comp : '¿Contrato?'}${fin ? ' · financiado ' + ent0(c.pct) + ' %' : ''}`),
+          det ? h('p', { class: 'sub' + (p.total == null ? ' alerta-txt' : '') }, det) : null,
+          p.nota ? h('p', { class: 'sub' }, p.nota) : null));
+      });
+      if (ps.length > 300) lista.append(h('p', { class: 'nota' }, `Se muestran 300 de ${ps.length}. Escriba para buscar.`));
+    };
+    q.addEventListener('input', () => { qPag = q.value; dibujar(); });
+    dibujar();
+  }
+
   function pintarContratos() {
     const filas = ordenar(filtrar(datos.contratos, f.fl));
     const br = barraRegistrar(); if (br) zona.append(br);
@@ -266,7 +308,7 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
           par('Monto del contrato', dinero$(c.monC)), par(`Nuestro ${dec2(c.pct)} %`, dinero$(c.monC * c.pct / 100)),
           par(`Del banco ${dec2(100 - c.pct)} %`, dinero$(c.monC * (100 - c.pct) / 100)), par('Entregado · nos toca', dinero$(c.monN)),
           par('Entregado · del banco', dinero$(c.monB)), par('Devuelto por el banco', dinero$(c.pag)),
-          par('Por cobrar real', dinero$(c.cobrar)))) : null,
+          par('Intereses / cargos banco', dinero$(c.cargos)), par('Por cobrar real', dinero$(c.cobrar)))) : null,
       h('div', { class: 'tarjeta' }, h('b', null, 'Para cerrar el contrato'),
         h('div', { class: 'pares' }, par('Sacos sugeridos', c.sug == null ? '—' : ent0(c.sug)), par('Promedio kg por saco', c.prom == null ? '—' : dec2(c.prom)))),
       h('div', { class: 'titulo-grupo' }, `Entregas (${ents.length})`));
@@ -284,7 +326,7 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
     }))));
     zona.append(h('div', { class: 'titulo-grupo' }, `Pagos (${pagos.length})`));
     if (!pagos.length) zona.append(h('p', { class: 'nota' }, 'Todavía no hay pagos registrados.'));
-    else zona.append(h('div', { class: 'tarjeta' }, ...pagos.map((p) => h('p', { class: 'fila-pago' }, `${fechaCorta(p.fecha)} · ${dinero$(p.monto)}${p.nota ? ' · ' + p.nota : ''}`, puedeEditarExp() && p.dbId != null ? h('button', { type: 'button', class: 'btn-mini', onclick: () => tras(nuevoPago(datos, c.id, p)) }, ' ✎') : null))));
+    else zona.append(h('div', { class: 'tarjeta' }, ...pagos.map((p) => h('p', { class: 'fila-pago' }, `${fechaCorta(p.fecha)} · ${c.finan ? 'depositado ' : ''}${dinero$(p.monto)}${p.cargo > 0 ? ' · intereses banco ' + dinero$(p.cargo) : ''}${c.finan && p.total == null ? ' · ⚠ falta el pago total' : ''}${p.nota ? ' · ' + p.nota : ''}`, puedeEditarExp() && p.dbId != null ? h('button', { type: 'button', class: 'btn-mini', onclick: () => tras(nuevoPago(datos, c.id, p)) }, ' ✎') : null))));
   }
 
   // ---- Tablas (reportes con gráficos y PDF) ----
@@ -312,6 +354,7 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
     if (detalleId) { pintarDetalle(); const c = datos.contratos.find((x) => x.id === detalleId); if (c) zona.append(boton('Compartir PDF del contrato', 'compartir', 'c-azul ancho-total', () => compartirContrato(c))); return; }
     if (tab === 'contratos') pintarContratos();
     else if (tab === 'seguimiento') pintarSeguimiento();
+    else if (tab === 'pagos') pintarPagos();
     else pintarTablas();
   }
   async function compartir() {
@@ -338,7 +381,7 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
       if (cache && !datos) usar(cache);
       if (forzar && !silencio) toast('Exportaciones: ' + r.error + (datos ? '\nSe muestran los últimos datos guardados.' : ''), 7000);
     } else {
-      const o = { v: 3, t: Date.now(), resumen: r.resumen, contratos: r.contratos, entregas: r.entregas, pagos: r.pagos, actualizado: r.actualizado, listas: r.listas, diasAlertaGuia: r.diasAlertaGuia };
+      const o = { v: 4, t: Date.now(), resumen: r.resumen, contratos: r.contratos, entregas: r.entregas, pagos: r.pagos, actualizado: r.actualizado, listas: r.listas, diasAlertaGuia: r.diasAlertaGuia };
       guardarCache(o); usar(o);
       if (forzar && !silencio) toast('Datos de Exportaciones actualizados.');
     }
