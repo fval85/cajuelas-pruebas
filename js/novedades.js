@@ -1,12 +1,37 @@
 // Novedades de cada versión (se muestran en Ajustes > Novedades de la versión).
 export const NOVEDADES = [
+  { v: '2.27.0', t: [
+    'Nueva pantalla de Inicio con un icono por módulo (Registro, Diario, Boletos, Reportes, Planillas y Ajustes). Ya no hay barra de abajo. En cada pantalla, el icono de casa 🏠 de arriba lleva al Inicio y el botón «atrás» del teléfono también.',
+    'Todos ven todos los iconos, pero solo entran a los que tienen permiso; los bloqueados salen con candado 🔒 al final y avisan que se pida el permiso a un administrador. Para administradores los iconos son más pequeños (3 por fila) y Ajustes va de último.',
+    'Avisos en el Inicio: saldo de boletos (después de las 7:00 pm) y planilla del día sin enviar (después de las 3:00 pm). Cada icono muestra cuántos envíos tiene sin enviar.',
+    'Se quitó «Mi barra de abajo» y la opción de bloquearla en Usuarios, porque ya no hace falta.',
+    'Entrar: ahora aparecen como botones los usuarios que ya usaron este teléfono. Si es otra persona, «No soy yo · buscar otro usuario» permite buscar escribiendo las primeras letras (ya no hay una lista larga).',
+    'Planillas: «Estado y nota ›» de cada empleado ahora se ve como un botón para que se note que ahí se cambia el estado del día y la nota.'
+  ] },
+  { v: '2.26.0', t: [
+    'Planillas: cada empleado ya sale con su fila completa (tarea de siempre, horas sugeridas y horas extra en 0). Tarea, Horas y Horas extra se cambian ahí mismo con − / +, y el botón «Listo» de la derecha marca a cada uno sin tener que abrirlo.',
+    'Adentro (toque en el nombre) quedan solo el estado del día y la nota. Si alguien hizo dos tareas, use «+ tarea» en su fila. Las horas extra se anotan en la primera tarea de la fila.',
+    'Igual que antes: no se puede enviar el día hasta que todos tengan ✓ Listo. Si cambia algo en una fila que ya estaba lista, vuelve a pendiente para confirmarla otra vez.',
+    'Ajustes › Usuarios: el aviso «Versión anterior» ahora dice cuál equipo es y qué versión tiene (por ejemplo, un segundo teléfono sin actualizar).'
+  ] },
+  { v: '2.25.0', t: [
+    'Ventas de exportación › Contratos: se quitó la ficha de arriba. Ahora se ven directo los botones rápidos, los totales, el gráfico, la tabla y las tarjetas de contratos (Compartir PDF y Descargar Excel siguen igual).',
+    'Café en fruta VOLCAFE: la tarjeta de Reportes muestra las CAJUELAS en grande (con fanegas y recibos) y al lado el avance de NESPRESSO AAA, su barra y lo que falta en fanegas y cajuelas.',
+    'Adentro, botones rápidos de tipo (Todos / Nespresso AAA / Maduro conv.), Finca y periodo (esta semana, este mes, toda la cosecha); tarjetas de cajuelas, avance, ritmo de los últimos 14 días y última entrega; gráfico por día (toque una columna para ver los recibos), barras por finca y lista de recibos con cajuelas y fanegas. Nuevos botones Compartir PDF y Descargar Excel.'
+  ] },
+  { v: '2.24.0', t: [
+    'Ventas de exportación › sobrante: cuando un contrato se entrega completo con kilos de más, el sobrante se calcula al precio del contrato y es 100 % nuestro (no pasa por el banco). Se ve en la tarjeta del contrato («▾ Ver más»), en la ficha y en el detalle, con lo que falta cobrar.',
+    'Registrar pago tiene «Tipo de pago»: «Pago del contrato» o «Factura de sobrante». La factura de sobrante entra completa, sin pago total ni depósito del banco. En la pestaña Pagos hay un filtro «Sobrantes». Requiere correr 32_exp_sobrante.sql.',
+    'Se quitaron los filtros guardados «★ Por cobrar» y «★ Por entregar este mes», porque ya están como botones rápidos.'
+  ] },
+  { v: '2.23.1', t: ['Ventas de exportación: la tarjeta de cada contrato (con «▾ Ver más») y la ficha de arriba ahora muestran también la calidad y la preparación.'] },
   { v: '2.23.0', t: [
     'Ventas de exportación › Contratos: cada tarjeta muestra dos barras, entrega (sacos entregados) y cobro (lo pagado contra lo que nos toca).',
-    'Con «▾ Ver más» la tarjeta se despliega con sacos y quintales, precio riel, fecha de entrega, kilos a favor, monto del contrato, monto entregado, nos toca, pagado + intereses del banco y por cobrar. «Ver detalle completo ›» abre el contrato como antes.'
+    'Con «▾ Ver más» la tarjeta se despliega con sacos y quintales, precio riel, fecha de entrega, kilos a favor, calidad, preparación, monto del contrato, monto entregado, nos toca, pagado + intereses del banco y por cobrar. «Ver detalle completo ›» abre el contrato como antes.'
   ] },
   { v: '2.22.0', t: [
     'Ventas de exportación › Contratos: botones rápidos a la vista (Por cobrar, Por entregar, Financiados, Este mes y Comprador). Un toque filtra y otro toque quita el filtro.',
-    'Arriba de la lista ahora hay una ficha con lo que se ocupa a mano: si es financiado, contratos, sacos y quintales, precio riel, cuánto se ha entregado, kilos a favor y próxima entrega. Al elegir un comprador, la ficha es de ese comprador.',
+    'Arriba de la lista ahora hay una ficha con lo que se ocupa a mano: si es financiado, contratos, sacos y quintales, precio riel, cuánto se ha entregado, kilos a favor, próxima entrega, calidad y preparación. Al elegir un comprador, la ficha es de ese comprador.',
     'Debajo: tarjetas de totales, gráfico de sacos por contrato y tabla (financiado, entrega, sacos, quintales, precio riel, % entregado, monto y por cobrar), con botones Compartir PDF y Descargar Excel.'
   ] },
   { v: '2.21.0', t: [

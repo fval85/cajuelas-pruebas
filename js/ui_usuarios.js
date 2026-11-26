@@ -40,9 +40,10 @@ function resumenConex(filas, nombre, vigente) {
   if (!mias.length) return { mias, sinDato: true, problemas: false, chips: [['Sin dato de conexión', 'gris']] };
   const u = mias[0], chips = [];
   const dias = diasSin(u.ultima), pend = mias.reduce((t, f) => t + totalPend(f.pendientes), 0);
-  const vieja = mias.some((f) => f.version && verMenor(f.version, vigente));
+  const viejas = mias.filter((f) => f.version && verMenor(f.version, vigente));
+  const vieja = viejas.length > 0;
   if (dias >= DIAS_ALERTA) chips.push([`🔴 Sin conexión ${dias} días`, 'rojo']);
-  if (vieja) chips.push([`🟠 Versión anterior (${vigente})`, 'ambar']);
+  if (vieja) chips.push([`🟠 Versión anterior: ${viejas.map((f) => `${f.dispositivo || 'Teléfono sin nombre'} v${f.version}`).join(' · ')} (vigente ${vigente})`, 'ambar']);
   if (pend) chips.push([`⚠ ${pend} envío${pend === 1 ? '' : 's'} pendiente${pend === 1 ? '' : 's'}: ${mias.map((f) => textoPend(f.pendientes)).filter(Boolean).join(' · ')}`, 'ambar']);
   const problemas = chips.length > 0;
   if (!problemas) chips.push(['✅ Al día', 'verde']);
@@ -144,7 +145,6 @@ export function pintarUsuarios({ raiz, irInicio }) {
     let modo = u.permisos.length ? 'pers' : 'rol';
     // Solo permisos que existen hoy: datos viejos (p. ej. «emitir») hacían que el servidor rechazara el guardado.
     const marcados = new Set((u.permisos.length ? u.permisos : u.efectivos).filter((p) => p !== 'todos' && p !== 'todo' && ETQ[p]));
-    let bloquear = !!u.bloquear;
     const zona = h('div');
     const pintarZona = () => {
       clear(zona);
@@ -166,17 +166,16 @@ export function pintarUsuarios({ raiz, irInicio }) {
       }
     };
     rol.addEventListener('change', pintarZona);
-    const cbBloq = h('input', { type: 'checkbox', checked: bloquear, onchange: () => { bloquear = cbBloq.checked; } });
     const guardar = h('button', { type: 'button', class: 'btn-texto primario ancho-total', onclick: async () => {
       let permisos = [];
       if (!esYo && modo === 'pers' && rol.value !== 'Administrador') { permisos = [...marcados].filter((p) => ETQ[p]); if (!permisos.length) return toast('Marque al menos un permiso o vuelva a «Lo del rol».'); }
       guardar.disabled = true;
-      const r = await usuariosAdmin('guardar', { id: u.id, rol: rol.value, permisos, bloquear });
+      const r = await usuariosAdmin('guardar', { id: u.id, rol: rol.value, permisos });
       guardar.disabled = false;
       if (!r.ok) return toast(r.message, 5000);
       toast(r.message + ' Le llega al teléfono de la persona cuando sincronice.', 4500); await cargar();
     } }, 'Guardar cambios');
-    raiz.append(h('label', { class: 'etiqueta' }, 'Rol'), rol, zona, h('label', { class: 'casilla' }, cbBloq, ' Barra de abajo bloqueada (el usuario no puede cambiarla)'), guardar,
+    raiz.append(h('label', { class: 'etiqueta' }, 'Rol'), rol, zona, guardar,
       h('button', { type: 'button', class: 'btn-texto ancho-total', onclick: () => restablecerPin(u) }, '🔑 Restablecer PIN'),
       esYo ? null : u.activo
         ? h('button', { type: 'button', class: 'btn-texto peligro ancho-total', onclick: async () => {
