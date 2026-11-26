@@ -327,3 +327,14 @@ button.interruptor { border: 0; padding: 0; cursor: pointer; }
 .botones-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 14px; }
 .botones-panel .btn { flex-direction: row; min-height: 52px; gap: 8px; }
 .btn.btn-excel { background: var(--tarjeta); color: var(--texto); border: 1.5px solid var(--borde); }
+/* 2.23.0 · Tarjeta de contrato: barras de entrega y cobro y «Ver más» */
+.lb-exp { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--gris); font-weight: 700; margin-top: 6px; }
+.lb-exp b { color: var(--texto); }
+.tarj-contrato .progreso { margin: 4px 0 2px; }
+.progreso.p-cobro i { background: var(--azul); }
+.chip-fin.chico { font-size: 11px; padding: 1px 8px; margin-left: 6px; }
+.tarj-pares { border-top: 1px solid var(--borde); padding-top: 8px; margin-top: 10px; }
+.tarj-pares b { text-align: right; }
+.tarj-pares .sep { grid-column: 1 / -1; border-top: 1px dashed var(--borde); margin: 2px 0; }
+.pie-tarj { display: flex; justify-content: space-between; margin: 6px -14px -8px; }
+.pie-tarj .btn-texto { font-size: 14px; }

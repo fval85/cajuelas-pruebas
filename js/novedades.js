@@ -1,5 +1,9 @@
 // Novedades de cada versión (se muestran en Ajustes > Novedades de la versión).
 export const NOVEDADES = [
+  { v: '2.23.0', t: [
+    'Ventas de exportación › Contratos: cada tarjeta muestra dos barras, entrega (sacos entregados) y cobro (lo pagado contra lo que nos toca).',
+    'Con «▾ Ver más» la tarjeta se despliega con sacos y quintales, precio riel, fecha de entrega, kilos a favor, monto del contrato, monto entregado, nos toca, pagado + intereses del banco y por cobrar. «Ver detalle completo ›» abre el contrato como antes.'
+  ] },
   { v: '2.22.0', t: [
     'Ventas de exportación › Contratos: botones rápidos a la vista (Por cobrar, Por entregar, Financiados, Este mes y Comprador). Un toque filtra y otro toque quita el filtro.',
     'Arriba de la lista ahora hay una ficha con lo que se ocupa a mano: si es financiado, contratos, sacos y quintales, precio riel, cuánto se ha entregado, kilos a favor y próxima entrega. Al elegir un comprador, la ficha es de ese comprador.',

@@ -177,15 +177,45 @@ export function crearVentasExp({ abrir, volver, alCambiar }) {
   };
   const ordenar = (l) => l.slice().sort((a, b) => ORDEN_SEM[a.sem] - ORDEN_SEM[b.sem] || a.id.localeCompare(b.id, 'es', { numeric: true }));
 
+  const abiertas = new Set();
   function tarjetaContrato(c) {
     const al = datos.alertas.por.get(c.id) || [];
-    return h('div', { class: 'tarj-contrato', role: 'button', tabindex: '0', onclick: () => { detalleId = c.id; redibujar(); window.scrollTo(0, 0); } },
+    const abrir = () => { detalleId = c.id; redibujar(); window.scrollTo(0, 0); };
+    const pctE = c.sacC ? Math.min(100, Math.round(c.sacE / c.sacC * 100)) : 0;
+    const base = c.finan ? c.monE * c.pct / 100 : c.monE;
+    const cobrado = (c.pag || 0) + (c.cargos || 0);
+    const pctC = base > 0.005 ? Math.min(100, Math.round(cobrado / base * 100)) : null;
+    const favTxt = c.fav == null || Math.abs(c.fav) < 0.005 ? '' : `${c.fav > 0 ? '+' : ''}${dec2(c.fav)} kg`;
+    const linea = (txt, pct) => h('div', { class: 'lb-exp' }, h('span', null, txt), h('b', null, pct == null ? '—' : pct + ' %'));
+    const barra = (pct, cls) => h('div', { class: 'progreso ' + cls, role: 'img', 'aria-label': (pct || 0) + ' %' }, h('i', { style: `width:${pct || 0}%` }));
+    const abierta = abiertas.has(c.id);
+    const pares = [
+      ['Sacos / quintales', `${ent0(c.sacC)} / ${dec2(c.qqC)} qq`],
+      ['Precio riel', c.precio ? dinero$(c.precio) : '—'],
+      ['Fecha de entrega', c.fent ? mesCorto(c.fent) : '—'],
+      ['Kilos a favor / contra', favTxt ? `${favTxt}${c.efe != null ? ' = ' + dinero$(c.efe) : ''}` : '—'],
+      null,
+      ['Monto del contrato', dinero$(c.monC)],
+      ['Monto entregado', dinero$(c.monE)],
+      ...(c.finan ? [[`Nos toca (${ent0(c.pct)} %)`, dinero$(base)]] : []),
+      [c.cargos ? 'Pagado + intereses banco' : 'Pagado', dinero$(cobrado)],
+      ['Por cobrar', dinero$(c.cobrar)]
+    ];
+    const det = abierta ? h('div', { class: 'ficha-pares tarj-pares' }, ...pares.flatMap((x) => (x ? [h('small', null, x[0]), h('b', null, x[1])] : [h('i', { class: 'sep' })]))) : null;
+    const toggle = (e) => { e.stopPropagation(); if (abiertas.has(c.id)) abiertas.delete(c.id); else abiertas.add(c.id); card.replaceWith(tarjetaContrato(c)); };
+    const card = h('div', { class: 'tarj-contrato', role: 'button', tabindex: '0', onclick: abrir },
       h('h3', null, h('span', null, punto(c.sem), c.id), chipSem(c.sem)),
-      h('p', { class: 'sub' }, `${c.comp} · ${c.tipo} · ${c.cos}${c.finan ? ' · Financiado ' + ent0(c.pct) + ' %' : ''}`),
-      barraProg(c),
-      h('p', { class: 'sub' }, `${ent0(c.sacE)} de ${ent0(c.sacC)} sacos entregados · faltan ${ent0(c.sacP)}`),
-      h('p', { class: 'sub' }, `Entregado ${dinero$(c.monE)} · Pagado ${dinero$(c.pag)} · Por cobrar ${dinero$(c.cobrar)}`),
-      al.length ? h('p', { class: 'sub alerta-txt' }, '⚠ ' + al.map((a) => a.t).join(' · ')) : null);
+      h('p', { class: 'sub' }, `${c.comp} · ${c.tipo} · ${c.cos}`, c.finan ? h('span', { class: 'chip-fin chico' }, `Financiado ${ent0(c.pct)} %`) : null),
+      linea(`Entrega · ${ent0(c.sacE)} de ${ent0(c.sacC)} sacos${favTxt ? ' · ' + favTxt : ''}`, pctE),
+      barra(pctE, 'p-entrega'),
+      linea(pctC == null ? 'Cobro · sin entregas todavía' : `Cobro · ${dinero$(cobrado)} de ${dinero$(base)}`, pctC),
+      barra(pctC, 'p-cobro'),
+      det,
+      al.length ? h('p', { class: 'sub alerta-txt' }, '⚠ ' + al.map((a) => a.t).join(' · ')) : null,
+      h('div', { class: 'pie-tarj' },
+        h('button', { type: 'button', class: 'btn-texto', 'aria-expanded': String(abierta), onclick: toggle }, abierta ? '▴ Ver menos' : '▾ Ver más'),
+        h('button', { type: 'button', class: 'btn-texto', onclick: (e) => { e.stopPropagation(); abrir(); } }, 'Ver detalle completo ›')));
+    return card;
   }
   async function tras(p) { if (await p) { await cargar(true, true); redibujar(); } }
   function barraRegistrar(idContrato = '') {
